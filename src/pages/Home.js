@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getCollection } from '../services/firebase/firestore';
 import { COLLECTIONS } from '../utils/constants';
 import { SettingsContext } from '../context/SettingsContext';
+import { HomePageSkeleton } from '../components/common/Skeleton';
 
 const TECH_COLORS = {
   React:'#61dafb',Vue:'#42b883',Angular:'#dd0031','Node.js':'#68a063',
@@ -139,6 +140,7 @@ const Home = () => {
   const [projects, setProjects] = useState([]);
   const [services, setServices] = useState([]);
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { settings } = useContext(SettingsContext);
 
   useEffect(() => {
@@ -149,8 +151,11 @@ const Home = () => {
     ]).then(([pr, sr]) => {
       if (pr.status === 'fulfilled') setProjects(pr.value.filter(p => p.featured).slice(0, 3));
       if (sr.status === 'fulfilled') setServices(sr.value.filter(s => s.featured).slice(0, 3));
+      setLoading(false);
     });
   }, []);
+
+  if (loading) return <HomePageSkeleton />;
 
   const stats = settings ? [
     { value: settings.stat1Value || '3+', label: settings.stat1Label || 'Years Experience' },

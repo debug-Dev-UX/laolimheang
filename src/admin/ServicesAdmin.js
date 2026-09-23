@@ -21,7 +21,7 @@ const css = `
   @media (max-width: 600px) { .modal-grid { grid-template-columns: 1fr !important; } }
 `;
 
-const emptyForm = { title:'', description:'', price:'', currency:'USD', category:'', features:'', featured:false };
+const emptyForm = { title:'', description:'', price:'', currency:'USD', period:'project', category:'', features:'', featured:false };
 const CATEGORIES = ['Design','Development','Marketing','Consulting','E-Commerce','Support','Other'];
 
 /* ─── Modal ─── */
@@ -83,7 +83,7 @@ const Modal = ({ open, onClose, onSave, initial }) => {
             </div>
           </div>
           {/* Row 2 */}
-          <div style={md.grid2} className="modal-grid">
+          <div style={md.grid3} className="modal-grid">
             <div style={md.field}>
               <label style={md.lbl}>Price</label>
               <input className="s-input" name="price" type="number" min="0" step="0.01" value={form.price} onChange={handle} placeholder="99" style={inp} />
@@ -92,6 +92,15 @@ const Modal = ({ open, onClose, onSave, initial }) => {
               <label style={md.lbl}>Currency</label>
               <select name="currency" value={form.currency} onChange={handle} style={{...inp, cursor:'pointer'}}>
                 {['USD','EUR','GBP','JPY','KHR','THB'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={md.field}>
+              <label style={md.lbl}>Billing Period</label>
+              <select name="period" value={form.period} onChange={handle} style={{...inp, cursor:'pointer'}}>
+                <option value="project">Per Project</option>
+                <option value="month">Per Month</option>
+                <option value="year">Per Year</option>
+                <option value="hour">Per Hour</option>
               </select>
             </div>
           </div>
@@ -274,6 +283,7 @@ const md = {
   xBtn: { width:'32px', height:'32px', borderRadius:'8px', background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.12)', color:'#64748b', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' },
   form: { padding:'20px 24px 24px', display:'flex', flexDirection:'column', gap:'16px' },
   grid2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px' },
+  grid3: { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'14px' },
   field: { display:'flex', flexDirection:'column', gap:'6px' },
   lbl: { color:'#64748b', fontSize:'12.5px', fontWeight:'500' },
 };

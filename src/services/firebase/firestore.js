@@ -23,7 +23,10 @@ export const getCollection = async (collectionName, constraints = []) => {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error(`Error fetching ${collectionName}:`, error);
+    console.warn(`Firestore getCollection [${collectionName}] notice:`, error?.message || error);
+    if (error?.code === 'permission-denied' || error?.message?.includes('insufficient permissions')) {
+      return [];
+    }
     throw error;
   }
 };
@@ -38,7 +41,10 @@ export const getDocument = async (collectionName, docId) => {
     }
     return null;
   } catch (error) {
-    console.error(`Error fetching document:`, error);
+    console.warn(`Firestore getDocument [${collectionName}/${docId}] notice:`, error?.message || error);
+    if (error?.code === 'permission-denied' || error?.message?.includes('insufficient permissions')) {
+      return null;
+    }
     throw error;
   }
 };
@@ -50,24 +56,39 @@ export const getDocumentsByField = async (collectionName, field, value) => {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error(`Error fetching documents:`, error);
+    console.warn(`Firestore getDocumentsByField [${collectionName}] notice:`, error?.message || error);
+    if (error?.code === 'permission-denied' || error?.message?.includes('insufficient permissions')) {
+      return [];
+    }
     throw error;
   }
+};
+
+// Sanitize object to remove undefined values that crash Firestore setDoc
+const sanitizeData = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const clean = {};
+  Object.keys(obj).forEach(key => {
+    if (obj[key] !== undefined) {
+      clean[key] = obj[key];
+    }
+  });
+  return clean;
 };
 
 // CREATE: Add new document
 export const addDocument = async (collectionName, data) => {
   try {
     const docRef = doc(collection(db, collectionName));
-    const docData = {
+    const docData = sanitizeData({
       ...data,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     await setDoc(docRef, docData);
     return { id: docRef.id, ...docData };
   } catch (error) {
-    console.error(`Error adding document:`, error);
+    console.error(`Error adding document to ${collectionName}:`, error);
     throw error;
   }
 };
@@ -76,14 +97,14 @@ export const addDocument = async (collectionName, data) => {
 export const setDocument = async (collectionName, docId, data) => {
   try {
     const docRef = doc(db, collectionName, docId);
-    const docData = {
+    const docData = sanitizeData({
       ...data,
-      updatedAt: new Date(),
-    };
+      updatedAt: new Date().toISOString(),
+    });
     await setDoc(docRef, docData);
     return { id: docId, ...docData };
   } catch (error) {
-    console.error(`Error setting document:`, error);
+    console.error(`Error setting document in ${collectionName}:`, error);
     throw error;
   }
 };
@@ -92,14 +113,14 @@ export const setDocument = async (collectionName, docId, data) => {
 export const updateDocument = async (collectionName, docId, data) => {
   try {
     const docRef = doc(db, collectionName, docId);
-    const updateData = {
+    const updateData = sanitizeData({
       ...data,
-      updatedAt: new Date(),
-    };
+      updatedAt: new Date().toISOString(),
+    });
     await updateDoc(docRef, updateData);
     return { id: docId, ...updateData };
   } catch (error) {
-    console.error(`Error updating document:`, error);
+    console.error(`Error updating document in ${collectionName}:`, error);
     throw error;
   }
 };
@@ -120,13 +141,21 @@ export const deleteDocument = async (collectionName, docId) => {
 export const subscribeToCollection = (collectionName, callback, constraints = []) => {
   try {
     const q = query(collection(db, collectionName), ...constraints);
-    return onSnapshot(q, snapshot => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(docs);
-    });
+    return onSnapshot(
+      q,
+      snapshot => {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(docs);
+      },
+      error => {
+        console.warn(`Firestore subscription notice [${collectionName}]:`, error?.message || error);
+        callback([]);
+      }
+    );
   } catch (error) {
-    console.error(`Error subscribing to collection:`, error);
-    throw error;
+    console.warn(`Error subscribing to collection ${collectionName}:`, error?.message || error);
+    callback([]);
+    return () => {};
   }
 };
 
@@ -134,14 +163,20 @@ export const subscribeToCollection = (collectionName, callback, constraints = []
 export const subscribeToDocument = (collectionName, docId, callback) => {
   try {
     const docRef = doc(db, collectionName, docId);
-    return onSnapshot(docRef, snapshot => {
-      if (snapshot.exists()) {
-        callback({ id: snapshot.id, ...snapshot.data() });
+    return onSnapshot(
+      docRef,
+      snapshot => {
+        if (snapshot.exists()) {
+          callback({ id: snapshot.id, ...snapshot.data() });
+        }
+      },
+      error => {
+        console.warn(`Firestore document subscription notice [${collectionName}/${docId}]:`, error?.message || error);
       }
-    });
+    );
   } catch (error) {
-    console.error(`Error subscribing to document:`, error);
-    throw error;
+    console.warn(`Error subscribing to document ${collectionName}/${docId}:`, error?.message || error);
+    return () => {};
   }
 };
 

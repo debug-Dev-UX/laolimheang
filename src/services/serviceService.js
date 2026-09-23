@@ -104,11 +104,11 @@ export const getServices = async () => {
   try {
     const q = query(collection(db, COLLECTION), orderBy("order", "asc"));
     const snap = await getDocs(q);
-    if (snap.empty) return DEFAULT_SERVICES;
+    if (snap.empty) return [];
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   } catch (error) {
     console.error("getServices:", error);
-    return DEFAULT_SERVICES;
+    return [];
   }
 };
 

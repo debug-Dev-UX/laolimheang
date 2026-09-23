@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getCollection } from '../services/firebase/firestore';
 import { COLLECTIONS } from '../utils/constants';
 import { Link } from 'react-router-dom';
+import { BlogPageSkeleton } from '../components/common/Skeleton';
 
 // --- Tilt Component ---
 const TiltContainer = ({ children, style, className, to }) => {
@@ -54,9 +55,15 @@ const Blog = () => {
   const loadBlogs = async () => {
     try {
       const data = await getCollection(COLLECTIONS.BLOGS);
-      setBlogs(data.filter(b => b.published).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      const published = (data || []).filter(b => b.published);
+      if (published.length > 0) {
+        setBlogs(published.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      } else {
+        setBlogs([]);
+      }
     } catch (error) {
-      console.error('Error loading blogs:', error);
+      console.warn('Could not load blogs from database:', error);
+      setBlogs([]);
     } finally {
       setLoading(false);
     }
@@ -78,7 +85,7 @@ const Blog = () => {
       {/* Content */}
       <section style={s.contentSec}>
         {loading ? (
-          <div style={s.loaderWrap}><div style={s.spinner} /></div>
+          <BlogPageSkeleton />
         ) : blogs.length === 0 ? (
           <div style={s.emptyState}>
             <div style={s.emptyIcon}>

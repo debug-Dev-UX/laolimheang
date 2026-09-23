@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { COLLECTIONS } from '../utils/constants';
+import { Base64UploadZone } from '../components/admin/Base64UploadZone';
+
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 const TECH_COLORS = {
@@ -61,7 +63,6 @@ const Modal = ({ open, onClose, onSave, initial }) => {
               { label: 'Category', name: 'category', placeholder: '', type: 'select' },
               { label: 'Live URL', name: 'liveUrl', placeholder: 'https://myproject.com' },
               { label: 'GitHub URL', name: 'githubUrl', placeholder: 'https://github.com/...' },
-              { label: 'Cover Image URL', name: 'imageUrl', placeholder: 'https://example.com/image.jpg' },
             ].map(({ label, name, placeholder, type, required }) => (
               <div key={name} style={m.field}>
                 <label style={m.label}>{label}</label>
@@ -79,6 +80,19 @@ const Modal = ({ open, onClose, onSave, initial }) => {
                 )}
               </div>
             ))}
+          </div>
+          
+          <div style={m.field}>
+            <label style={m.label}>Cover Image *</label>
+            <Base64UploadZone
+              currentUrl={form.imageUrl}
+              onUploaded={url => setForm(p => ({ ...p, imageUrl: url }))}
+            />
+            <input name="imageUrl" value={form.imageUrl} onChange={handle} placeholder="Or paste image URL directly..."
+              style={{ ...m.input, marginTop: '8px', fontSize: '12px' }}
+              onFocus={e => e.target.style.borderColor = '#6366f1'}
+              onBlur={e => e.target.style.borderColor = 'rgba(99,102,241,0.2)'}
+            />
           </div>
 
           <div style={m.field}>

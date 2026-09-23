@@ -9,9 +9,11 @@ export const ROUTES = {
   ABOUT: '/about',
   SERVICES: '/services',
   PORTFOLIO: '/portfolio',
+  GALLERY: '/gallery',
   BLOG: '/blog',
   BLOG_POST: '/blog/:slug',
   CONTACT: '/contact',
+  DONATE: '/donate',
   ADMIN_LOGIN: '/admin/login',
   ADMIN_DASHBOARD: '/admin',
   ADMIN_SERVICES: '/admin/services',
@@ -21,6 +23,10 @@ export const ROUTES = {
   ADMIN_ANALYTICS: '/admin/analytics',
   ADMIN_SETTINGS: '/admin/settings',
   ADMIN_SKILLS: '/admin/skills',
+  ADMIN_GALLERY: '/admin/gallery',
+  ADMIN_PROJECT_IMAGES: '/admin/project-images',
+  PROJECT_IMAGES: '/project-images',
+  ADMIN_ADS: '/admin/ads',
   NOT_FOUND: '*',
 };
 
@@ -38,6 +44,9 @@ export const COLLECTIONS = {
   VISITORS: 'visitors',
   SETTINGS: 'settings',
   SKILLS: 'skills',
+  ADS: 'ads',
+  GALLERY: 'gallery',
+  PROJECT_IMAGES: 'project_images',
 };
 
 // Storage Folders
@@ -46,6 +55,8 @@ export const STORAGE_FOLDERS = {
   BLOGS: 'blogs',
   SETTINGS: 'settings',
   AVATARS: 'avatars',
+  GALLERY: 'gallery',
+  PROJECT_IMAGES: 'project_images',
 };
 
 // Page Size

@@ -42,10 +42,11 @@ const SettingsAdmin = () => {
 
   const tabs = [
     { id: 'general', label: 'General' },
-    { id: 'home', label: 'Home Stats' },
-    { id: 'about', label: 'About Me' },
-    { id: 'seo', label: 'SEO' },
-    { id: 'social', label: 'Social' },
+    { id: 'home',    label: 'Home Stats' },
+    { id: 'about',   label: 'About Me' },
+    { id: 'seo',     label: 'SEO' },
+    { id: 'social',  label: 'Social' },
+    { id: 'footer',  label: '🔲 Footer' },
   ];
 
   const Field = ({ label, name, type = 'text', placeholder = '', multiline = false, hint = '' }) => (
@@ -127,6 +128,7 @@ const SettingsAdmin = () => {
                 <Field label="Contact Email" name="email" type="email" placeholder="hello@example.com" />
                 <Field label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
                 <Field label="Telegram Username" name="telegramUsername" placeholder="@yourusername" />
+                <Field label="Location" name="location" placeholder="Phnom Penh, Cambodia" />
               </div>
               <Field label="Site Description" name="description" multiline placeholder="A brief description of your site..." hint="Used in email footers and about sections." />
               <Field label="Footer Text" name="footerText" placeholder="© 2025 LaolimHeang. All rights reserved." />
@@ -170,14 +172,101 @@ const SettingsAdmin = () => {
               <p style={f.section}>Social Media Links</p>
               <div style={f.grid}>
                 {[
-                  { label: 'GitHub', name: 'github', ph: 'https://github.com/yourname' },
-                  { label: 'LinkedIn', name: 'linkedin', ph: 'https://linkedin.com/in/yourname' },
+                  { label: 'GitHub',    name: 'github',    ph: 'https://github.com/yourname' },
+                  { label: 'LinkedIn',  name: 'linkedin',  ph: 'https://linkedin.com/in/yourname' },
                   { label: 'Twitter / X', name: 'twitter', ph: 'https://x.com/yourhandle' },
-                  { label: 'Facebook', name: 'facebook', ph: 'https://facebook.com/yourpage' },
+                  { label: 'Facebook',  name: 'facebook',  ph: 'https://facebook.com/yourpage' },
+                  { label: 'Instagram', name: 'instagram', ph: 'https://instagram.com/yourhandle' },
+                  { label: 'Dribbble', name: 'dribbble',  ph: 'https://dribbble.com/yourname' },
+                  { label: 'Telegram', name: 'telegram',  ph: 'https://t.me/yourhandle' },
                 ].map(({ label, name, ph }) => (
                   <Field key={name} label={label} name={name} placeholder={ph} />
                 ))}
               </div>
+            </>
+          )}
+
+          {activeTab === 'footer' && (
+            <>
+              <p style={f.section}>Brand &amp; Tagline</p>
+              <div style={f.grid}>
+                <Field
+                  label="Footer Tagline"
+                  name="footerTagline"
+                  placeholder="Full-Stack Engineer & System Architect..."
+                  hint="Shown under your name. Falls back to Site Description if empty."
+                />
+              </div>
+
+              <p style={f.section}>Availability Status</p>
+              <div style={f.grid}>
+                <div style={f.fieldGroup}>
+                  <label style={f.label}>Show 'Available' Badge</label>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                    {[{ val: 'true', label: '✓ Visible' }, { val: 'false', label: '✕ Hidden' }].map(opt => (
+                      <button
+                        key={opt.val}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, footerAvailable: opt.val !== 'false' }))}
+                        style={{
+                          padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
+                          cursor: 'pointer', border: '1px solid',
+                          background: String(formData.footerAvailable ?? true) === opt.val
+                            ? (opt.val === 'true' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)')
+                            : 'rgba(255,255,255,0.03)',
+                          borderColor: String(formData.footerAvailable ?? true) === opt.val
+                            ? (opt.val === 'true' ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.3)')
+                            : 'rgba(99,102,241,0.15)',
+                          color: String(formData.footerAvailable ?? true) === opt.val
+                            ? (opt.val === 'true' ? '#4ade80' : '#f87171')
+                            : '#64748b',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Field
+                  label="Badge Label"
+                  name="footerAvailText"
+                  placeholder="Available for projects"
+                  hint="Text shown inside the availability badge."
+                />
+              </div>
+
+              <p style={f.section}>Call-To-Action</p>
+              <div style={f.grid}>
+                <Field
+                  label="CTA Button Text"
+                  name="footerCtaText"
+                  placeholder="Start a Project"
+                  hint="Text on the button that links to /contact."
+                />
+                <Field
+                  label="Contact Description"
+                  name="footerContactDesc"
+                  placeholder="Have a project in mind? Let's build something great together."
+                  hint="Short text above the CTA button."
+                />
+              </div>
+
+              <p style={f.section}>Technologies / Skills</p>
+              <Field
+                label="Skills List (comma-separated)"
+                name="footerSkills"
+                placeholder="React, Node.js, Firebase, TypeScript, MongoDB..."
+                hint="Each item becomes a pill tag. Leave empty to use the default list."
+              />
+
+              <p style={f.section}>Copyright</p>
+              <Field
+                label="Footer Copyright Text"
+                name="footerText"
+                placeholder={`© ${new Date().getFullYear()} LaolimHeang. All rights reserved.`}
+                hint="Displayed at the very bottom. Leave blank to auto-generate from Site Name."
+              />
             </>
           )}
         </div>

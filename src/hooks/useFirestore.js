@@ -12,11 +12,13 @@ export const useFirestore = (collectionName) => {
     setError(null);
     try {
       const result = await firestoreService.getCollection(collectionName, constraints);
-      setData(result);
-      return result;
+      setData(result || []);
+      return result || [];
     } catch (err) {
+      console.warn(`useFirestore [${collectionName}]:`, err?.message || err);
       setError(err);
-      throw err;
+      setData([]);
+      return [];
     } finally {
       setLoading(false);
     }

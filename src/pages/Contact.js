@@ -93,7 +93,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <span style={s.itemLbl}>Phone</span>
-                    <a href="tel:+1234567890" style={s.itemVal}>+1 (234) 567-890</a>
+                    <a href={`tel:${settings?.phone || ''}`} style={s.itemVal}>{settings?.phone || '+1 (234) 567-890'}</a>
                   </div>
                 </div>
                 
@@ -103,7 +103,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <span style={s.itemLbl}>Email</span>
-                    <a href="mailto:hello@laolimheang.com" style={s.itemVal}>hello@laolimheang.com</a>
+                    <a href={`mailto:${settings?.email || ''}`} style={s.itemVal}>{settings?.email || 'hello@laolimheang.com'}</a>
                   </div>
                 </div>
 
@@ -113,7 +113,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <span style={s.itemLbl}>Location</span>
-                    <span style={s.itemVal}>Phnom Penh, Cambodia</span>
+                    <span style={s.itemVal}>{settings?.location || 'Phnom Penh, Cambodia'}</span>
                   </div>
                 </div>
               </div>

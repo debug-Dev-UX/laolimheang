@@ -1,18 +1,25 @@
 // Auth Context
 import React, { createContext, useState, useEffect } from 'react';
 import * as authService from '../services/firebase/auth';
+import { setAdminSession, clearAdminSession, getAdminSession } from '../utils/sessionCookie';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const existingSession = getAdminSession();
+  const [user, setUser] = useState(existingSession || null);
+  const [loading, setLoading] = useState(!existingSession);
+  const [isAdmin, setIsAdmin] = useState(!!existingSession);
 
   useEffect(() => {
-    const unsubscribe = authService.subscribeToAuthChanges(user => {
-      setUser(user);
-      setIsAdmin(!!user);
+    const unsubscribe = authService.subscribeToAuthChanges(authUser => {
+      setUser(authUser);
+      setIsAdmin(!!authUser);
+      if (authUser) {
+        setAdminSession(authUser);
+      } else if (!existingSession) {
+        clearAdminSession();
+      }
       setLoading(false);
     });
 
@@ -21,7 +28,11 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (email, password) => {
     try {
-      return await authService.signin(email, password);
+      const authUser = await authService.signin(email, password);
+      setUser(authUser);
+      setIsAdmin(true);
+      setAdminSession(authUser);
+      return authUser;
     } catch (error) {
       throw error;
     }
@@ -32,7 +43,9 @@ export const AuthProvider = ({ children }) => {
       await authService.logout();
       setUser(null);
       setIsAdmin(false);
+      clearAdminSession();
     } catch (error) {
+      clearAdminSession();
       throw error;
     }
   };

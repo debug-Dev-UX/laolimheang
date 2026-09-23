@@ -16,11 +16,14 @@ const BlogPost = () => {
   const loadBlog = async () => {
     try {
       const data = await getDocumentsByField(COLLECTIONS.BLOGS, 'slug', slug);
-      if (data.length > 0) {
+      if (data && data.length > 0) {
         setBlog(data[0]);
+      } else {
+        setBlog(null);
       }
     } catch (error) {
-      console.error('Error loading blog:', error);
+      console.warn('Error loading blog from database:', error);
+      setBlog(null);
     } finally {
       setLoading(false);
     }

@@ -1,115 +1,17 @@
-// src/components/three/HeroScene.jsx
-// Three.js / React Three Fiber animated hero background
+// Enhanced 3D Reactive Hero Canvas with Interactive Camera & Particle Constellations
+import React, { useRef, Suspense } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Float, Sphere, MeshDistortMaterial } from '@react-three/drei';
+import ParticleField from './PartCleField';
+import { FloatingWireIcosahedron, FloatingGlowOctahedron, FloatingCyberRing } from './FloatingShapes';
 
-import React, { useRef, useMemo, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Points, PointMaterial } from "@react-three/drei";
-import * as THREE from "three";
-
-// Particle field
-function ParticleField({ count = 3000 }) {
-  const ref = useRef();
-
-  const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 20;
-      arr[i * 3 + 1] = (Math.random() - 0.5) * 20;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 20;
-    }
-    return arr;
-  }, [count]);
-
-  useFrame((state) => {
-    if (ref.current) {
-      ref.current.rotation.y = state.clock.elapsedTime * 0.02;
-      ref.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.01) * 0.1;
-    }
-  });
-
-  return (
-    <Points ref={ref} positions={positions} stride={3} frustumCulled={false}>
-      <PointMaterial
-        transparent
-        color="#3b82f6"
-        size={0.04}
-        sizeAttenuation
-        depthWrite={false}
-        opacity={0.7}
-      />
-    </Points>
-  );
-}
-
-// Floating geometric mesh
-function FloatingOrb({ position, scale, speed, color }) {
-  const ref = useRef();
-  const offset = useRef(Math.random() * Math.PI * 2);
-
-  useFrame((state) => {
-    if (ref.current) {
-      const t = state.clock.elapsedTime;
-      ref.current.position.y = position[1] + Math.sin(t * speed + offset.current) * 0.3;
-      ref.current.rotation.x = t * speed * 0.4;
-      ref.current.rotation.z = t * speed * 0.3;
-    }
-  });
-
-  return (
-    <mesh ref={ref} position={position} scale={scale}>
-      <octahedronGeometry args={[1, 0]} />
-      <meshStandardMaterial
-        color={color}
-        wireframe
-        transparent
-        opacity={0.15}
-      />
-    </mesh>
-  );
-}
-
-// Main ring
-function RingMesh() {
-  const ref = useRef();
-  useFrame((state) => {
-    if (ref.current) {
-      ref.current.rotation.x = state.clock.elapsedTime * 0.1;
-      ref.current.rotation.z = state.clock.elapsedTime * 0.05;
-    }
-  });
-  return (
-    <mesh ref={ref} position={[2, 0, -2]}>
-      <torusGeometry args={[2, 0.02, 16, 100]} />
-      <meshStandardMaterial color="#60a5fa" transparent opacity={0.3} />
-    </mesh>
-  );
-}
-
-// Scene setup
-function Scene() {
-  return (
-    <>
-      <ambientLight intensity={0.4} />
-      <pointLight position={[10, 10, 10]} intensity={1} color="#3b82f6" />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} color="#8b5cf6" />
-      <ParticleField count={2500} />
-      <FloatingOrb position={[-3, 0.5, -1]} scale={0.6} speed={0.4} color="#3b82f6" />
-      <FloatingOrb position={[3, -0.5, -2]} scale={0.8} speed={0.3} color="#60a5fa" />
-      <FloatingOrb position={[0, 1.5, -3]} scale={0.4} speed={0.5} color="#93c5fd" />
-      <FloatingOrb position={[-1.5, -1, 1]} scale={0.5} speed={0.35} color="#2563eb" />
-      <RingMesh />
-    </>
-  );
-}
-
-// Camera that responds to mouse
 function CameraRig() {
   const { camera, mouse } = useThree();
   const target = useRef({ x: 0, y: 0 });
 
   useFrame(() => {
-    target.current.x += (mouse.x * 0.5 - target.current.x) * 0.05;
-    target.current.y += (-mouse.y * 0.3 - target.current.y) * 0.05;
+    target.current.x += (mouse.x * 0.8 - target.current.x) * 0.05;
+    target.current.y += (-mouse.y * 0.5 - target.current.y) * 0.05;
     camera.position.x = target.current.x;
     camera.position.y = target.current.y;
     camera.lookAt(0, 0, 0);
@@ -118,17 +20,72 @@ function CameraRig() {
   return null;
 }
 
-const HeroScene = () => {
+function CentralNexusCore() {
+  const meshRef = useRef();
+
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x = state.clock.elapsedTime * 0.15;
+      meshRef.current.rotation.y = state.clock.elapsedTime * 0.25;
+    }
+  });
+
   return (
-    <div className="absolute inset-0 w-full h-full">
+    <Float speed={2} rotationIntensity={0.4} floatIntensity={0.5}>
+      <Sphere ref={meshRef} args={[1.2, 64, 64]} scale={1.4}>
+        <MeshDistortMaterial
+          color="#6366f1"
+          attach="material"
+          distort={0.45}
+          speed={1.8}
+          roughness={0.15}
+          metalness={0.9}
+        />
+      </Sphere>
+    </Float>
+  );
+}
+
+function SceneContent() {
+  return (
+    <>
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[8, 10, 5]} intensity={1.4} color="#818cf8" />
+      <pointLight position={[-8, -6, -4]} intensity={0.8} color="#06b6d4" />
+      <pointLight position={[6, -4, 4]} intensity={0.6} color="#8b5cf6" />
+
+      {/* Particle Cosmos */}
+      <ParticleField count={2500} color="#60a5fa" size={0.035} radius={14} />
+
+      {/* Centerpiece distorted energy core */}
+      <CentralNexusCore />
+
+      {/* Cyber rings */}
+      <FloatingCyberRing position={[0, 0, 0]} radius={2.6} tube={0.02} color="#8b5cf6" speed={0.4} />
+      <FloatingCyberRing position={[0, 0, 0]} radius={3.4} tube={0.015} color="#06b6d4" speed={-0.3} />
+
+      {/* Floating geometric cyber shapes */}
+      <FloatingWireIcosahedron position={[-3.2, 1.2, -1]} scale={0.7} color="#38bdf8" speed={1} />
+      <FloatingWireIcosahedron position={[3.4, -1.2, -2]} scale={0.9} color="#818cf8" speed={0.8} />
+      <FloatingGlowOctahedron position={[-2.4, -1.8, 1]} scale={0.6} color="#10b981" speed={1.2} />
+      <FloatingGlowOctahedron position={[2.8, 2, -1.5]} scale={0.5} color="#f59e0b" speed={1.4} />
+    </>
+  );
+}
+
+const HeroScene = ({ className = 'absolute inset-0 w-full h-full' }) => {
+  return (
+    <div className={className} style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
       <Canvas
-        camera={{ position: [0, 0, 6], fov: 60 }}
+        camera={{ position: [0, 0, 5.5], fov: 50 }}
         dpr={[1, 1.5]}
-        gl={{ antialias: false, alpha: true }}
-        style={{ background: "transparent" }}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+        style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}
       >
-        <CameraRig />
-        <Scene />
+        <Suspense fallback={null}>
+          <CameraRig />
+          <SceneContent />
+        </Suspense>
       </Canvas>
     </div>
   );
