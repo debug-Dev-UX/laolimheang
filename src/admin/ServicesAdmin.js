@@ -1,28 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { COLLECTIONS } from '../utils/constants';
+import {
+  Briefcase,
+  Plus,
+  Edit3,
+  Trash2,
+  X,
+  Sparkles,
+  CheckCircle2,
+  Star,
+  Check,
+} from 'lucide-react';
 
-/* ─── shared styles ─── */
-const css = `
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-  .admin-table { width:100%; border-collapse:collapse; min-width:700px; }
-  .admin-table thead tr { border-bottom:1px solid rgba(99,102,241,0.1); }
-  .admin-table th { padding:12px 16px; color:#334155; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; text-align:left; }
-  .admin-table tbody tr { border-bottom:1px solid rgba(99,102,241,0.05); transition:background 0.15s; }
-  .admin-table tbody tr:hover { background:rgba(99,102,241,0.04); }
-  .admin-table td { padding:14px 16px; }
-  .s-edit-btn { padding:5px 14px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.2); border-radius:7px; color:#818cf8; font-size:12px; font-weight:500; cursor:pointer; transition:background 0.15s; }
-  .s-edit-btn:hover { background:rgba(99,102,241,0.22); }
-  .s-del-btn { padding:5px 14px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.15); border-radius:7px; color:#f87171; font-size:12px; font-weight:500; cursor:pointer; transition:background 0.15s; }
-  .s-del-btn:hover { background:rgba(239,68,68,0.18); }
-  .s-input:focus { border-color:#6366f1 !important; }
-  .s-cancel:hover { background:rgba(99,102,241,0.08) !important; color:#818cf8 !important; }
-  @media (max-width: 600px) { .modal-grid { grid-template-columns: 1fr !important; } }
-`;
-
-const emptyForm = { title:'', description:'', price:'', currency:'USD', period:'project', category:'', features:'', featured:false };
-const CATEGORIES = ['Design','Development','Marketing','Consulting','E-Commerce','Support','Other'];
+const CATEGORIES = ['Design', 'Development', 'Marketing', 'Consulting', 'E-Commerce', 'Support', 'Other'];
+const emptyForm = { title: '', description: '', price: '', currency: 'USD', period: 'project', category: '', features: '', featured: false };
 
 /* ─── Modal ─── */
 const Modal = ({ open, onClose, onSave, initial }) => {
@@ -30,17 +22,20 @@ const Modal = ({ open, onClose, onSave, initial }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setForm(initial
-      ? { ...emptyForm, ...initial, features: (initial.features||[]).join(', '), price: initial.price ?? '' }
-      : emptyForm
-    );
+    if (open) {
+      setForm(
+        initial
+          ? { ...emptyForm, ...initial, features: (initial.features || []).join(', '), price: initial.price ?? '' }
+          : emptyForm
+      );
+    }
   }, [open, initial]);
 
   if (!open) return null;
 
   const handle = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm(p => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
+    setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const submit = async (e) => {
@@ -49,97 +44,171 @@ const Modal = ({ open, onClose, onSave, initial }) => {
     const payload = {
       ...form,
       price: parseFloat(form.price) || 0,
-      features: form.features.split(',').map(f => f.trim()).filter(Boolean),
+      features: form.features.split(',').map((f) => f.trim()).filter(Boolean),
     };
     await onSave(payload);
     setSaving(false);
     onClose();
   };
 
-  const inp = { padding:'9px 13px', background:'rgba(15,15,30,0.8)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:'9px', color:'#e2e8f0', fontSize:'13.5px', outline:'none', boxSizing:'border-box', width:'100%', fontFamily:'inherit', transition:'border-color 0.2s' };
-
   return (
-    <div style={md.backdrop} onClick={e => { if(e.target===e.currentTarget) onClose(); }}>
-      <div style={md.box}>
-        <div style={md.head}>
-          <h2 style={md.title}>{initial ? 'Edit Service' : 'Add New Service'}</h2>
-          <button style={md.xBtn} onClick={onClose}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-xs" onClick={onClose} />
+      <div className="relative bg-white border-2 border-black max-w-2xl w-full p-6 sm:p-8 z-10 max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-slide-up">
+        <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+              COMMERCIAL CATALOG
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black">
+              {initial ? 'EDIT SERVICE PACKAGE' : 'ADD NEW SERVICE OFFERING'}
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-1 text-black hover:text-neutral-500">
+            <X className="w-5 h-5" />
           </button>
         </div>
-        <form onSubmit={submit} style={md.form}>
-          {/* Row 1 */}
-          <div style={md.grid2} className="modal-grid">
-            <div style={md.field}>
-              <label style={md.lbl}>Service Title *</label>
-              <input className="s-input" name="title" value={form.title} onChange={handle} required placeholder="Web Design" style={inp} />
+
+        <form onSubmit={submit} className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                SERVICE TITLE *
+              </label>
+              <input
+                name="title"
+                value={form.title}
+                onChange={handle}
+                required
+                placeholder="FULL-STACK WEB PLATFORM"
+                className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+              />
             </div>
-            <div style={md.field}>
-              <label style={md.lbl}>Category</label>
-              <select name="category" value={form.category} onChange={handle} style={{...inp, cursor:'pointer'}}>
-                <option value="">Select category...</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-          {/* Row 2 */}
-          <div style={md.grid3} className="modal-grid">
-            <div style={md.field}>
-              <label style={md.lbl}>Price</label>
-              <input className="s-input" name="price" type="number" min="0" step="0.01" value={form.price} onChange={handle} placeholder="99" style={inp} />
-            </div>
-            <div style={md.field}>
-              <label style={md.lbl}>Currency</label>
-              <select name="currency" value={form.currency} onChange={handle} style={{...inp, cursor:'pointer'}}>
-                {['USD','EUR','GBP','JPY','KHR','THB'].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={md.field}>
-              <label style={md.lbl}>Billing Period</label>
-              <select name="period" value={form.period} onChange={handle} style={{...inp, cursor:'pointer'}}>
-                <option value="project">Per Project</option>
-                <option value="month">Per Month</option>
-                <option value="year">Per Year</option>
-                <option value="hour">Per Hour</option>
-              </select>
-            </div>
-          </div>
-          {/* Description */}
-          <div style={md.field}>
-            <label style={md.lbl}>Description</label>
-            <textarea className="s-input" name="description" value={form.description} onChange={handle} rows={3}
-              placeholder="What does this service include?" style={{...inp, resize:'vertical', lineHeight:'1.55'}} />
-          </div>
-          {/* Features */}
-          <div style={md.field}>
-            <label style={md.lbl}>Features <span style={{color:'#334155',fontWeight:'400'}}>(comma-separated)</span></label>
-            <input className="s-input" name="features" value={form.features} onChange={handle}
-              placeholder="Logo design, 3 revisions, Source files" style={inp} />
-            {form.features && (
-              <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginTop:'8px'}}>
-                {form.features.split(',').map(f=>f.trim()).filter(Boolean).map((f,i) => (
-                  <span key={i} style={{fontSize:'11px',padding:'3px 10px',borderRadius:'20px',background:'rgba(99,102,241,0.1)',color:'#818cf8',border:'1px solid rgba(99,102,241,0.2)'}}>✓ {f}</span>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                CATEGORY
+              </label>
+              <select
+                name="category"
+                value={form.category}
+                onChange={handle}
+                className="w-full bg-neutral-100 border border-neutral-300 text-black text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+              >
+                <option value="">SELECT CATEGORY...</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c.toUpperCase()}</option>
                 ))}
-              </div>
-            )}
-          </div>
-          {/* Featured toggle */}
-          <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',userSelect:'none'}}>
-            <div style={{position:'relative',width:'36px',height:'20px',flexShrink:0}} onClick={() => setForm(p=>({...p,featured:!p.featured}))}>
-              <div style={{position:'absolute',inset:0,borderRadius:'10px',background:form.featured?'linear-gradient(135deg,#6366f1,#8b5cf6)':'rgba(30,41,59,0.8)',transition:'background 0.2s',border:'1px solid rgba(99,102,241,0.2)'}} />
-              <div style={{position:'absolute',top:'2px',left:form.featured?'18px':'2px',width:'16px',height:'16px',borderRadius:'50%',background:'white',transition:'left 0.2s',boxShadow:'0 1px 4px rgba(0,0,0,0.3)'}} />
+              </select>
             </div>
-            <span style={{color:'#94a3b8',fontSize:'13px'}}>Mark as Featured service</span>
-          </label>
-          {/* Actions */}
-          <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',paddingTop:'4px'}}>
-            <button type="button" className="s-cancel" onClick={onClose}
-              style={{padding:'9px 20px',background:'transparent',border:'1px solid rgba(99,102,241,0.15)',borderRadius:'9px',color:'#475569',fontSize:'13.5px',fontWeight:'500',cursor:'pointer',transition:'all 0.15s'}}>
-              Cancel
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                PRICE *
+              </label>
+              <input
+                name="price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.price}
+                onChange={handle}
+                placeholder="1200"
+                className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                CURRENCY
+              </label>
+              <select
+                name="currency"
+                value={form.currency}
+                onChange={handle}
+                className="w-full bg-neutral-100 border border-neutral-300 text-black text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+              >
+                {['USD', 'EUR', 'GBP', 'JPY', 'KHR', 'THB'].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                BILLING PERIOD
+              </label>
+              <select
+                name="period"
+                value={form.period}
+                onChange={handle}
+                className="w-full bg-neutral-100 border border-neutral-300 text-black text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+              >
+                <option value="project">PER PROJECT</option>
+                <option value="month">PER MONTH</option>
+                <option value="hour">PER HOUR</option>
+                <option value="fixed">FIXED PRICE</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-black uppercase tracking-wider text-black">
+              SERVICE SCOPE & DESCRIPTION
+            </label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handle}
+              rows={3}
+              placeholder="Architecture planning, database schema modeling, zero-downtime deployment..."
+              className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-black uppercase tracking-wider text-black">
+              DELIVERABLES / FEATURES (COMMA-SEPARATED)
+            </label>
+            <input
+              name="features"
+              value={form.features}
+              onChange={handle}
+              placeholder="Production Next.js, PostgreSQL cluster, CI/CD Pipeline, 1-Year Support"
+              className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="svc-featured"
+              name="featured"
+              checked={form.featured}
+              onChange={handle}
+              className="w-4 h-4 accent-black rounded-none cursor-pointer"
+            />
+            <label htmlFor="svc-featured" className="text-xs font-bold uppercase tracking-wider text-black cursor-pointer">
+              MARK AS FEATURED TIER ON SERVICES PAGE
+            </label>
+          </div>
+
+          <div className="pt-4 border-t border-neutral-200 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 border border-neutral-300 text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors"
+            >
+              CANCEL
             </button>
-            <button type="submit" disabled={saving}
-              style={{display:'flex',alignItems:'center',gap:'8px',padding:'9px 22px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:'9px',color:'white',fontSize:'13.5px',fontWeight:'600',cursor:saving?'not-allowed':'pointer',opacity:saving?0.7:1,boxShadow:'0 4px 14px rgba(99,102,241,0.35)'}}>
-              {saving ? <><span style={spin}/> Saving...</> : (initial ? 'Update Service' : 'Add Service')}
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-8 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+            >
+              {saving ? 'SAVING...' : 'SAVE SERVICE'}
             </button>
           </div>
         </form>
@@ -148,144 +217,211 @@ const Modal = ({ open, onClose, onSave, initial }) => {
   );
 };
 
-/* ─── Main ─── */
+/* ─── Main Component ─── */
 const ServicesAdmin = () => {
-  const { data: services, loading, getCollection, addDoc, updateDoc, deleteDoc } = useFirestore(COLLECTIONS.SERVICES);
-  const [search, setSearch] = useState('');
+  const { data: services, loading, add, update, remove } = useFirestore(COLLECTIONS.SERVICES);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editItem, setEditItem] = useState(null);
+  const [editService, setEditService] = useState(null);
+  const [filterCat, setFilterCat] = useState('all');
   const [toast, setToast] = useState('');
 
-  useEffect(() => { getCollection(); }, []);
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+  const openAdd = () => {
+    setEditService(null);
+    setModalOpen(true);
+  };
 
-  const filtered = services.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+  const openEdit = (s) => {
+    setEditService(s);
+    setModalOpen(true);
+  };
 
-  const handleSave = async (data) => {
-    if (editItem) { await updateDoc(editItem.id, data); showToast('Service updated!'); }
-    else { await addDoc(data); showToast('Service added!'); }
+  const handleSave = async (payload) => {
+    try {
+      if (editService) {
+        await update(editService.id, payload);
+        showToast('Service updated successfully.');
+      } else {
+        await add(payload);
+        showToast('Service created successfully.');
+      }
+      setModalOpen(false);
+    } catch (err) {
+      showToast('Error: ' + err.message);
+    }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this service?')) return;
-    await deleteDoc(id);
-    showToast('Service deleted.');
+    try {
+      await remove(id);
+      showToast('Service deleted.');
+    } catch (err) {
+      showToast('Error: ' + err.message);
+    }
   };
 
-  return (
-    <div style={pg.page}>
-      <style>{css}</style>
+  const usedCategories = ['all', ...new Set((services || []).map((s) => s.category).filter(Boolean))];
 
-      {/* Toast */}
+  const filtered = (services || []).filter((s) => {
+    if (filterCat === 'all') return true;
+    return s.category === filterCat;
+  });
+
+  return (
+    <div className="space-y-8 animate-fade-in">
       {toast && (
-        <div style={pg.toast}>✓ {toast}</div>
+        <div className="fixed top-6 right-6 z-50 bg-black text-white px-5 py-3 text-xs font-black tracking-wider uppercase border border-neutral-700 shadow-2xl flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toast}</span>
+        </div>
       )}
 
-      {/* Header */}
-      <div style={pg.header}>
-        <div>
-          <h1 style={pg.title}>Services</h1>
-          <p style={pg.sub}><span style={{color:'#818cf8',fontWeight:'600'}}>{services.length}</span> total · <span style={{color:'#f59e0b',fontWeight:'600'}}>{services.filter(s=>s.featured).length}</span> featured</p>
-        </div>
-        <button style={pg.addBtn} onClick={() => { setEditItem(null); setModalOpen(true); }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
-          Add Service
-        </button>
-      </div>
-
-      {/* Search */}
-      <div style={{position:'relative',maxWidth:'360px'}}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#475569',pointerEvents:'none'}}>
-          <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </svg>
-        <input placeholder="Search services..." value={search} onChange={e=>setSearch(e.target.value)} style={pg.sInput} />
-      </div>
-
-      {/* Table */}
-      <div style={pg.tableWrap}>
-        {loading ? (
-          <div style={pg.center}><div style={spin} /></div>
-        ) : filtered.length === 0 ? (
-          <div style={pg.center}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style={{color:'#1e293b',marginBottom:'12px'}}>
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <p style={{color:'#334155',margin:'0 0 16px',fontSize:'14px'}}>{search ? 'No services match your search' : 'No services yet'}</p>
-            {!search && <button style={pg.addBtn} onClick={() => { setEditItem(null); setModalOpen(true); }}>Add First Service</button>}
+      {/* Header Banner */}
+      <div className="border border-neutral-200 bg-white p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-black text-white text-[10px] font-black tracking-widest uppercase">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>COMMERCIAL PACKAGES</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-black">
+              COMMERCIAL SERVICES & SOLUTIONS
+            </h1>
+            <p className="text-xs text-neutral-500 font-medium">
+              Configure engineering service tiers, pricing models, deliverable checklists, and SLAs.
+            </p>
           </div>
-        ) : (
-          <table className="admin-table">
-            <thead><tr><th>Service</th><th>Price</th><th>Category</th><th>Featured</th><th>Actions</th></tr></thead>
-            <tbody>
-              {filtered.map(svc => (
-                <tr key={svc.id}>
-                  <td>
-                    <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                      <div style={{width:'34px',height:'34px',borderRadius:'9px',background:'rgba(99,102,241,0.12)',border:'1px solid rgba(99,102,241,0.2)',display:'flex',alignItems:'center',justifyContent:'center',color:'#818cf8',fontWeight:'700',fontSize:'14px',flexShrink:0}}>
-                        {svc.title?.[0]?.toUpperCase()||'S'}
-                      </div>
-                      <div>
-                        <p style={{color:'#e2e8f0',fontWeight:'600',fontSize:'13.5px',margin:'0 0 2px'}}>{svc.title}</p>
-                        {svc.description && <p style={{color:'#334155',fontSize:'11.5px',margin:0,maxWidth:'260px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{svc.description}</p>}
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span style={{color:'#34d399',fontWeight:'700',fontSize:'14px'}}>{svc.currency||'$'}{svc.price!=null?Number(svc.price).toLocaleString():'—'}</span>
-                  </td>
-                  <td><span style={{color:'#64748b',fontSize:'13px'}}>{svc.category||'—'}</span></td>
-                  <td>
-                    <span style={{fontSize:'11px',fontWeight:'600',padding:'3px 10px',borderRadius:'20px',
-                      background:svc.featured?'rgba(99,102,241,0.14)':'rgba(30,41,59,0.6)',
-                      color:svc.featured?'#818cf8':'#334155',
-                      border:svc.featured?'1px solid rgba(99,102,241,0.25)':'1px solid rgba(30,41,59,0.8)'}}>
-                      {svc.featured?'★ Featured':'Standard'}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{display:'flex',gap:'8px'}}>
-                      <button className="s-edit-btn" onClick={() => { setEditItem(svc); setModalOpen(true); }}>Edit</button>
-                      <button className="s-del-btn" onClick={() => handleDelete(svc.id)}>Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+
+          <button
+            onClick={openAdd}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all duration-200 active:scale-95 cursor-pointer shadow-xs shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>ADD NEW SERVICE</span>
+          </button>
+        </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleSave} initial={editItem} />
+      {/* Category Pills Bar */}
+      <div className="bg-white border border-neutral-200 p-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {usedCategories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setFilterCat(cat)}
+            className={`px-3.5 py-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
+              filterCat === cat
+                ? 'bg-black text-white'
+                : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
+            }`}
+          >
+            {cat === 'all' ? 'ALL SERVICES' : cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Services Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="border border-neutral-200 bg-white p-6 space-y-4">
+              <div className="h-4 w-1/3 skeleton-shimmer" />
+              <div className="h-6 w-3/4 skeleton-shimmer" />
+              <div className="h-12 w-full skeleton-shimmer" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="border-2 border-dashed border-neutral-300 p-16 text-center space-y-3 bg-white">
+          <Briefcase className="w-12 h-12 text-neutral-400 mx-auto stroke-[1.5]" />
+          <p className="text-base font-black uppercase text-black">NO SERVICES DEFINED YET</p>
+          <p className="text-xs text-neutral-500 uppercase tracking-wider">
+            Create your first service offering to display it on the commercial catalog.
+          </p>
+          <button
+            onClick={openAdd}
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add First Service</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((svc) => (
+            <div
+              key={svc.id}
+              className="bg-white border border-neutral-200 hover:border-black p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                  <span className="bg-neutral-100 text-black text-[9px] font-black uppercase tracking-widest px-2 py-0.5">
+                    {svc.category || 'SERVICE'}
+                  </span>
+                  {svc.featured && (
+                    <span className="bg-amber-500 text-black text-[9px] font-black uppercase tracking-widest px-2 py-0.5 flex items-center gap-1">
+                      <Star className="w-2.5 h-2.5 fill-black" />
+                      <span>FEATURED</span>
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-black group-hover:underline">
+                    {svc.title}
+                  </h3>
+                  <div className="mt-2 text-2xl font-black uppercase tracking-tight text-black">
+                    {svc.price ? `$${svc.price}` : 'CUSTOM'}
+                    <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">
+                      / {svc.period || 'PROJECT'}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-neutral-600 line-clamp-3 leading-relaxed">
+                  {svc.description}
+                </p>
+
+                {svc.features && svc.features.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-neutral-100">
+                    {svc.features.slice(0, 4).map((f, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-xs text-neutral-700 font-medium">
+                        <Check className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-6 mt-6 border-t border-neutral-100 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => openEdit(svc)}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-black hover:text-white text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>EDIT</span>
+                </button>
+                <button
+                  onClick={() => handleDelete(svc.id)}
+                  className="p-2 text-neutral-400 hover:text-rose-600 border border-neutral-200 hover:border-rose-300 transition-colors"
+                  title="Delete service"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleSave} initial={editService} />
     </div>
   );
-};
-
-const spin = { display:'inline-block', width:'14px', height:'14px', border:'2px solid rgba(99,102,241,0.25)', borderTopColor:'#6366f1', borderRadius:'50%', animation:'spin 0.8s linear infinite', flexShrink:0 };
-
-const pg = {
-  page: { display:'flex', flexDirection:'column', gap:'20px', fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif" },
-  header: { display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'12px' },
-  title: { color:'#f1f5f9', fontSize:'24px', fontWeight:'700', margin:'0 0 5px', letterSpacing:'-0.02em' },
-  sub: { color:'#475569', fontSize:'13px', margin:0 },
-  addBtn: { display:'flex', alignItems:'center', gap:'7px', padding:'10px 18px', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', border:'none', borderRadius:'10px', color:'white', fontSize:'13.5px', fontWeight:'600', cursor:'pointer', boxShadow:'0 4px 15px rgba(99,102,241,0.35)' },
-  sInput: { width:'100%', paddingLeft:'36px', paddingRight:'14px', paddingTop:'10px', paddingBottom:'10px', background:'rgba(15,15,30,0.7)', border:'1px solid rgba(99,102,241,0.15)', borderRadius:'10px', color:'#e2e8f0', fontSize:'13.5px', outline:'none', boxSizing:'border-box' },
-  tableWrap: { background:'rgba(10,10,24,0.6)', border:'1px solid rgba(99,102,241,0.08)', borderRadius:'16px', overflowX:'auto' },
-  center: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'60px 20px' },
-  toast: { position:'fixed', top:'20px', right:'24px', zIndex:200, padding:'12px 18px', borderRadius:'10px', background:'rgba(16,185,129,0.15)', border:'1px solid rgba(16,185,129,0.3)', color:'#34d399', fontSize:'13.5px', fontWeight:'500', animation:'fadeIn 0.2s ease', boxShadow:'0 8px 30px rgba(0,0,0,0.4)' },
-};
-
-const md = {
-  backdrop: { position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(6px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' },
-  box: { background:'#0d0d20', border:'1px solid rgba(99,102,241,0.15)', borderRadius:'20px', width:'100%', maxWidth:'580px', maxHeight:'90vh', overflow:'auto', boxShadow:'0 30px 60px rgba(0,0,0,0.6)' },
-  head: { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'22px 24px 0' },
-  title: { color:'#f1f5f9', fontSize:'18px', fontWeight:'700', margin:0, letterSpacing:'-0.01em' },
-  xBtn: { width:'32px', height:'32px', borderRadius:'8px', background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.12)', color:'#64748b', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' },
-  form: { padding:'20px 24px 24px', display:'flex', flexDirection:'column', gap:'16px' },
-  grid2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px' },
-  grid3: { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'14px' },
-  field: { display:'flex', flexDirection:'column', gap:'6px' },
-  lbl: { color:'#64748b', fontSize:'12.5px', fontWeight:'500' },
 };
 
 export default ServicesAdmin;

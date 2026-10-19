@@ -1,7 +1,16 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getCollection, addDocument, updateDocument, deleteDocument } from '../services/firebase/firestore';
 import { COLLECTIONS } from '../utils/constants';
-import { ToastContext } from '../context/ToastContext';
+import {
+  Cpu,
+  Plus,
+  Edit3,
+  Trash2,
+  X,
+  Sparkles,
+  CheckCircle2,
+  Layers,
+} from 'lucide-react';
 
 const SkillsAdmin = () => {
   const [skills, setSkills] = useState([]);
@@ -9,14 +18,18 @@ const SkillsAdmin = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  
+  const [toast, setToast] = useState('');
+
   const [formData, setFormData] = useState({
     category: '',
     items: '',
-    order: 0
+    order: 0,
   });
 
-  const { showSuccess, showError } = useContext(ToastContext);
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
 
   useEffect(() => {
     loadSkills();
@@ -25,9 +38,9 @@ const SkillsAdmin = () => {
   const loadSkills = async () => {
     try {
       const data = await getCollection(COLLECTIONS.SKILLS);
-      setSkills(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      setSkills((data || []).sort((a, b) => (a.order || 0) - (b.order || 0)));
     } catch (err) {
-      showError('Error loading skills');
+      showToast('Error loading skills: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -39,11 +52,11 @@ const SkillsAdmin = () => {
       setFormData({
         category: skill.category || '',
         items: (skill.items || []).join(', '),
-        order: skill.order || 0
+        order: skill.order || 0,
       });
     } else {
       setEditingId(null);
-      setFormData({ category: '', items: '', order: skills.length });
+      setFormData({ category: '', items: '', order: skills.length + 1 });
     }
     setModalOpen(true);
   };
@@ -57,148 +70,264 @@ const SkillsAdmin = () => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const itemsArray = formData.items.split(',').map(s => s.trim()).filter(Boolean);
+      const itemsArray = formData.items.split(',').map((s) => s.trim()).filter(Boolean);
       const dataToSave = {
         category: formData.category,
         items: itemsArray,
-        order: Number(formData.order)
+        order: Number(formData.order) || 0,
       };
 
       if (editingId) {
         await updateDocument(COLLECTIONS.SKILLS, editingId, dataToSave);
-        showSuccess('Skill group updated');
+        showToast('Skill group updated.');
       } else {
         await addDocument(COLLECTIONS.SKILLS, dataToSave);
-        showSuccess('Skill group added');
+        showToast('Skill group created.');
       }
       handleCloseModal();
       loadSkills();
     } catch (err) {
-      showError(err.message);
+      showToast('Error: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this skill group?')) return;
+    if (!window.confirm('Delete this skill group?')) return;
     try {
       await deleteDocument(COLLECTIONS.SKILLS, id);
-      showSuccess('Skill group deleted');
+      showToast('Skill group deleted.');
       loadSkills();
     } catch (err) {
-      showError(err.message);
+      showToast('Error: ' + err.message);
     }
   };
 
-  // Seed default if empty
   const handleSeed = async () => {
     const defaults = [
-      { category: 'Frontend', items: ['React', 'Vue', 'Angular', 'Next.js', 'TailwindCSS'], order: 1 },
-      { category: 'Backend', items: ['Node.js', 'Python', 'PHP', 'GraphQL'], order: 2 },
-      { category: 'Database', items: ['MongoDB', 'Firebase', 'PostgreSQL'], order: 3 },
-      { category: 'DevOps', items: ['Docker', 'AWS', 'Git'], order: 4 },
+      { category: 'Frontend', items: ['React', 'Vue', 'Next.js', 'TailwindCSS', 'TypeScript'], order: 1 },
+      { category: 'Backend', items: ['Node.js', 'Express', 'Python', 'REST APIs', 'GraphQL'], order: 2 },
+      { category: 'Database', items: ['PostgreSQL', 'Firebase', 'MongoDB', 'Redis'], order: 3 },
+      { category: 'DevOps', items: ['Docker', 'AWS', 'Git CI/CD', 'Linux'], order: 4 },
     ];
-    setIsSubmitting(true);
-    for (const d of defaults) {
-      await addDocument(COLLECTIONS.SKILLS, d);
+    try {
+      for (const d of defaults) {
+        await addDocument(COLLECTIONS.SKILLS, d);
+      }
+      showToast('Standard skill categories initialized.');
+      loadSkills();
+    } catch (err) {
+      showToast('Error: ' + err.message);
     }
-    setIsSubmitting(false);
-    loadSkills();
-    showSuccess('Default skills added');
   };
 
   return (
-    <div style={s.page}>
-      <style>{css}</style>
-      
-      <div style={s.header}>
-        <div>
-          <h1 style={s.title}>My Arsenal (Skills)</h1>
-          <p style={s.sub}>Manage technologies and skill categories</p>
+    <div className="space-y-8 animate-fade-in">
+      {toast && (
+        <div className="fixed top-6 right-6 z-50 bg-black text-white px-5 py-3 text-xs font-black tracking-wider uppercase border border-neutral-700 shadow-2xl flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toast}</span>
         </div>
-        <div style={{display:'flex', gap:'12px'}}>
-          {skills.length === 0 && (
-            <button onClick={handleSeed} disabled={isSubmitting} style={s.ghostBtn} className="hover-lift">
-              Seed Defaults
+      )}
+
+      {/* Header Banner */}
+      <div className="border border-neutral-200 bg-white p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-black text-white text-[10px] font-black tracking-widest uppercase">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>TECHNICAL CAPABILITIES</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-black">
+              ENGINEERING SKILLS & COMPETENCIES
+            </h1>
+            <p className="text-xs text-neutral-500 font-medium">
+              Manage technical skill groups, framework proficiencies, and capability matrices.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {skills.length === 0 && (
+              <button
+                onClick={handleSeed}
+                className="px-4 py-3 bg-neutral-100 hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors"
+              >
+                INITIALIZE DEFAULTS
+              </button>
+            )}
+            <button
+              onClick={() => handleOpenModal()}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all duration-200 active:scale-95 cursor-pointer shadow-xs shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>ADD SKILL GROUP</span>
             </button>
-          )}
-          <button onClick={() => handleOpenModal()} style={s.addBtn} className="hover-lift">
-            + Add Category
-          </button>
+          </div>
         </div>
       </div>
 
-      <div style={s.card}>
-        {loading ? (
-          <div style={s.empty}>Loading...</div>
-        ) : skills.length === 0 ? (
-          <div style={s.empty}>No skills found. Click "Add Category" or "Seed Defaults" to start.</div>
-        ) : (
-          <div style={s.grid}>
-            {skills.map((skill) => (
-              <div key={skill.id} style={s.skillCard}>
-                <div style={s.skillHead}>
-                  <h3 style={s.skillTitle}>{skill.category}</h3>
-                  <div style={{display:'flex',gap:'6px'}}>
-                    <button onClick={() => handleOpenModal(skill)} style={s.actionBtn}>Edit</button>
-                    <button onClick={() => handleDelete(skill.id)} style={{...s.actionBtn, color:'#f87171'}}>Del</button>
-                  </div>
+      {/* Skills Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="border border-neutral-200 bg-white p-6 space-y-4">
+              <div className="h-5 w-1/2 skeleton-shimmer" />
+              <div className="h-10 w-full skeleton-shimmer" />
+            </div>
+          ))}
+        </div>
+      ) : skills.length === 0 ? (
+        <div className="border-2 border-dashed border-neutral-300 p-16 text-center space-y-3 bg-white">
+          <Cpu className="w-12 h-12 text-neutral-400 mx-auto stroke-[1.5]" />
+          <p className="text-base font-black uppercase text-black">NO SKILL GROUPS CONFIGURED</p>
+          <p className="text-xs text-neutral-500 uppercase tracking-wider">
+            Add your engineering competencies or initialize default groupings.
+          </p>
+          <div className="flex justify-center gap-3 pt-2">
+            <button
+              onClick={handleSeed}
+              className="px-6 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300"
+            >
+              Load Defaults
+            </button>
+            <button
+              onClick={() => handleOpenModal()}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Custom Group</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {skills.map((skill, idx) => (
+            <div
+              key={skill.id}
+              className="bg-white border border-neutral-200 hover:border-black p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+                    CATEGORY 0{idx + 1}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                    ORDER: {skill.order ?? idx}
+                  </span>
                 </div>
-                <div style={s.tags}>
-                  {(skill.items || []).map(item => (
-                    <span key={item} style={s.tag}>{item}</span>
+
+                <h3 className="text-lg font-black uppercase tracking-tight text-black group-hover:underline">
+                  {skill.category}
+                </h3>
+
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {(skill.items || []).map((item, i) => (
+                    <span
+                      key={i}
+                      className="bg-neutral-100 text-neutral-800 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 border border-neutral-200"
+                    >
+                      {item}
+                    </span>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {modalOpen && (
-        <div style={s.modalOverlay}>
-          <div style={s.modal}>
-            <div style={s.modalHead}>
-              <h2 style={s.modalTitle}>{editingId ? 'Edit Category' : 'Add Category'}</h2>
-              <button onClick={handleCloseModal} style={s.closeBtn}>✕</button>
+              <div className="pt-6 mt-6 border-t border-neutral-100 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => handleOpenModal(skill)}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-black hover:text-white text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>EDIT</span>
+                </button>
+                <button
+                  onClick={() => handleDelete(skill.id)}
+                  className="p-2 text-neutral-400 hover:text-rose-600 border border-neutral-200 hover:border-rose-300 transition-colors"
+                  title="Delete category"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <form onSubmit={handleSubmit} style={s.form}>
-              <div style={s.field}>
-                <label style={s.lbl}>Category Name</label>
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xs" onClick={handleCloseModal} />
+          <div className="relative bg-white border-2 border-black max-w-lg w-full p-6 sm:p-8 z-10 space-y-6 shadow-2xl animate-slide-up">
+            <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+                  SKILLS INVENTORY
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black">
+                  {editingId ? 'EDIT SKILL GROUP' : 'ADD SKILL GROUP'}
+                </h2>
+              </div>
+              <button onClick={handleCloseModal} className="p-1 text-black hover:text-neutral-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                  CATEGORY NAME *
+                </label>
                 <input
                   type="text"
                   required
-                  style={s.inp}
                   value={formData.category}
-                  onChange={e => setFormData({...formData, category: e.target.value})}
-                  placeholder="e.g. Frontend"
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="FRONTEND ENGINEERING"
+                  className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
                 />
               </div>
-              <div style={s.field}>
-                <label style={s.lbl}>Skills (comma separated)</label>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                  TECHNOLOGIES (COMMA-SEPARATED) *
+                </label>
                 <textarea
                   required
-                  rows="3"
-                  style={{...s.inp, resize:'vertical'}}
+                  rows={3}
                   value={formData.items}
-                  onChange={e => setFormData({...formData, items: e.target.value})}
-                  placeholder="React, Vue, Tailwind CSS"
+                  onChange={(e) => setFormData({ ...formData, items: e.target.value })}
+                  placeholder="React 18, Next.js, TypeScript, TailwindCSS, Vite"
+                  className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
                 />
               </div>
-              <div style={s.field}>
-                <label style={s.lbl}>Order</label>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                  DISPLAY ORDER
+                </label>
                 <input
                   type="number"
-                  style={s.inp}
                   value={formData.order}
-                  onChange={e => setFormData({...formData, order: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, order: e.target.value })}
+                  className="w-full bg-neutral-100 border border-neutral-300 text-black text-xs font-medium p-3 focus:outline-none focus:border-black"
                 />
               </div>
-              <div style={s.modalActions}>
-                <button type="button" onClick={handleCloseModal} style={s.cancelBtn}>Cancel</button>
-                <button type="submit" disabled={isSubmitting} style={s.submitBtn}>
-                  {isSubmitting ? 'Saving...' : 'Save Category'}
+
+              <div className="pt-4 border-t border-neutral-200 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-6 py-3 border border-neutral-300 text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-8 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'SAVING...' : 'SAVE CATEGORY'}
                 </button>
               </div>
             </form>
@@ -207,47 +336,6 @@ const SkillsAdmin = () => {
       )}
     </div>
   );
-};
-
-const css = `
-  .hover-lift { transition: transform 0.2s; }
-  .hover-lift:hover { transform: translateY(-2px); }
-  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-`;
-
-const s = {
-  page: { color: '#e2e8f0', minHeight: '100%', paddingBottom:'40px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' },
-  title: { fontSize: '28px', fontWeight: '800', margin: '0 0 8px', color: '#f1f5f9' },
-  sub: { fontSize: '14px', color: '#64748b', margin: 0 },
-  addBtn: { padding: '10px 20px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: '12px', color: 'white', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' },
-  ghostBtn: { padding: '10px 20px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '12px', color: '#818cf8', fontWeight: '600', cursor: 'pointer' },
-  
-  card: { background: 'rgba(12,12,26,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '24px', padding: '32px' },
-  empty: { textAlign: 'center', color: '#64748b', padding: '40px 0' },
-  
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' },
-  skillCard: { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px' },
-  skillHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' },
-  skillTitle: { fontSize: '18px', fontWeight: '700', color: '#f1f5f9', margin: 0 },
-  actionBtn: { background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '12px', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px' },
-  
-  tags: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
-  tag: { padding: '4px 10px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', color: '#818cf8', fontSize: '12px', fontWeight: '600' },
-  
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, animation: 'fade 0.2s ease' },
-  modal: { width: '100%', maxWidth: '500px', background: '#0a0a18', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px', overflow: 'hidden', animation: 'slide 0.3s ease', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' },
-  modalHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)' },
-  modalTitle: { margin: 0, fontSize: '20px', fontWeight: '700', color: '#f1f5f9' },
-  closeBtn: { background: 'transparent', border: 'none', color: '#64748b', fontSize: '20px', cursor: 'pointer' },
-  form: { padding: '24px' },
-  field: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' },
-  lbl: { fontSize: '13px', color: '#94a3b8', fontWeight: '500' },
-  inp: { padding: '12px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', fontSize: '14px', outline: 'none' },
-  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' },
-  cancelBtn: { padding: '10px 20px', background: 'transparent', border: 'none', color: '#94a3b8', fontWeight: '600', cursor: 'pointer' },
-  submitBtn: { padding: '10px 24px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: '10px', color: 'white', fontWeight: '600', cursor: 'pointer' }
 };
 
 export default SkillsAdmin;

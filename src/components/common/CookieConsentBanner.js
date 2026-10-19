@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { getCookie, setCookie, getUserSession, COOKIE_KEYS } from '../../utils/sessionCookie';
+import { getCookie, setCookie, COOKIE_KEYS } from '../../utils/sessionCookie';
 
 const CookieConsentBanner = () => {
   const [visible, setVisible] = useState(false);
-  const [showTelemetry, setShowTelemetry] = useState(false);
-  const [session, setSession] = useState(null);
 
   useEffect(() => {
     const consent = getCookie(COOKIE_KEYS.COOKIE_CONSENT);
-    const activeSession = getUserSession();
-    setSession(activeSession);
-
-    // Only show if user has not yet consented
     if (!consent) {
-      const timer = setTimeout(() => setVisible(true), 1200);
+      const timer = setTimeout(() => setVisible(true), 1000);
       return () => clearTimeout(timer);
     }
   }, []);
@@ -32,155 +25,37 @@ const CookieConsentBanner = () => {
   if (!visible) return null;
 
   return (
-    <AnimatePresence>
-      <motion.aside
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '24px',
-          right: '24px',
-          maxWidth: '680px',
-          margin: '0 auto',
-          background: 'rgba(10, 12, 24, 0.88)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(99, 102, 241, 0.15)',
-          borderRadius: '20px',
-          padding: '20px 24px',
-          zIndex: 9999,
-          color: '#f8fafc',
-          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flex: 1, minWidth: '280px' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25))',
-                border: '1px solid rgba(99, 102, 241, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-                flexShrink: 0,
-              }}
-            >
-              🍪
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.01em' }}>
-                  User Session & Cookie Preferences
-                </span>
-                <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: 'rgba(6, 182, 212, 0.15)', color: '#22d3ee', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
-                  Active
-                </span>
-              </div>
-              <p style={{ color: '#94a3b8', fontSize: '12.5px', lineHeight: 1.5, margin: 0 }}>
-                We use secure cookies and local sessions to remember your 3D spatial settings, navigation telemetry, and interactive preferences.
-              </p>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setShowTelemetry(!showTelemetry)}
-              style={{
-                padding: '8px 14px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '10px',
-                color: '#cbd5e1',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-            >
-              {showTelemetry ? 'Hide Details' : 'Session Info'}
-            </button>
-            <button
-              type="button"
-              onClick={handleDecline}
-              style={{
-                padding: '8px 14px',
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '10px',
-                color: '#94a3b8',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Essential Only
-            </button>
-            <button
-              type="button"
-              onClick={handleAccept}
-              style={{
-                padding: '8px 18px',
-                background: 'linear-gradient(135deg, #6366f1, #06b6d4)',
-                border: 'none',
-                borderRadius: '10px',
-                color: 'white',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
-              }}
-            >
-              Accept & Continue
-            </button>
-          </div>
+    <div className="fixed bottom-4 left-4 right-4 max-w-xl mx-auto z-50 bg-white border-2 border-black p-5 shadow-2xl">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-neutral-200">
+          <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
+            COOKIE & ANALYTICS NOTICE
+          </span>
+          <span className="text-[10px] font-bold text-black uppercase">
+            PRIVACY FIRST
+          </span>
         </div>
 
-        {/* Expandable Session Telemetry Info */}
-        {showTelemetry && session && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            style={{
-              marginTop: '16px',
-              paddingTop: '14px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-              gap: '12px',
-              fontSize: '11.5px',
-            }}
+        <p className="text-xs text-neutral-600 leading-relaxed font-medium">
+          This portfolio uses minimal session storage and cookies to measure performance and remember your preferences. No third-party ad trackers are used.
+        </p>
+
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            onClick={handleAccept}
+            className="flex-1 py-2.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-widest transition-colors"
           >
-            <div>
-              <span style={{ color: '#64748b', display: 'block', fontWeight: 600 }}>SESSION TOKEN</span>
-              <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{session.sessionId ? `${session.sessionId.slice(0, 16)}...` : 'Generating...'}</span>
-            </div>
-            <div>
-              <span style={{ color: '#64748b', display: 'block', fontWeight: 600 }}>DEVICE TYPE</span>
-              <span style={{ color: '#34d399', textTransform: 'capitalize' }}>{session.device || 'Desktop'}</span>
-            </div>
-            <div>
-              <span style={{ color: '#64748b', display: 'block', fontWeight: 600 }}>VISIT COUNT</span>
-              <span style={{ color: '#fbbf24' }}>#{session.visitCount || 1} Session</span>
-            </div>
-            <div>
-              <span style={{ color: '#64748b', display: 'block', fontWeight: 600 }}>COOKIE EXPIRY</span>
-              <span style={{ color: '#cbd5e1' }}>7 Days (Rolling)</span>
-            </div>
-          </motion.div>
-        )}
-      </motion.aside>
-    </AnimatePresence>
+            ACCEPT & CONTINUE
+          </button>
+          <button
+            onClick={handleDecline}
+            className="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors"
+          >
+            DECLINE
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 

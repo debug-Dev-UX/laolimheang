@@ -3,6 +3,7 @@ import { SettingsContext } from '../context/SettingsContext';
 import { setDocument } from '../services/firebase/firestore';
 import { COLLECTIONS } from '../utils/constants';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { Save, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 
 const SettingsAdmin = () => {
   const { settings, loading } = useContext(SettingsContext);
@@ -12,11 +13,13 @@ const SettingsAdmin = () => {
   const [toastType, setToastType] = useState('success');
   const [activeTab, setActiveTab] = useState('general');
 
-  useEffect(() => { if (settings) setFormData(settings); }, [settings]);
+  useEffect(() => {
+    if (settings) setFormData(settings);
+  }, [settings]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const showToast = (msg, type = 'success') => {
@@ -26,11 +29,11 @@ const SettingsAdmin = () => {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSaving(true);
     try {
       await setDocument(COLLECTIONS.SETTINGS, formData.id || 'default', formData);
-      showToast('Settings saved successfully!', 'success');
+      showToast('System configuration saved successfully!', 'success');
     } catch (error) {
       showToast('Error saving settings: ' + error.message, 'error');
     } finally {
@@ -41,26 +44,30 @@ const SettingsAdmin = () => {
   if (loading) return <LoadingSpinner />;
 
   const tabs = [
-    { id: 'general', label: 'General' },
-    { id: 'home',    label: 'Home Stats' },
-    { id: 'about',   label: 'About Me' },
-    { id: 'seo',     label: 'SEO' },
-    { id: 'social',  label: 'Social' },
-    { id: 'footer',  label: '🔲 Footer' },
+    { id: 'general', label: 'GENERAL INFO' },
+    { id: 'home', label: 'HOME STATS' },
+    { id: 'about', label: 'ABOUT BIO' },
+    { id: 'seo', label: 'SEO & META' },
+    { id: 'social', label: 'SOCIAL CHANNELS' },
+    { id: 'footer', label: 'FOOTER & CTAS' },
   ];
 
-  const Field = ({ label, name, type = 'text', placeholder = '', multiline = false, hint = '' }) => (
-    <div style={f.fieldGroup}>
-      <label style={f.label}>{label}</label>
-      {hint && <p style={f.hint}>{hint}</p>}
+  const Field = ({ label, name, type = 'text', placeholder = '', multiline = false, hint = '', uppercase = false }) => (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-black uppercase tracking-wider text-black">
+          {label}
+        </label>
+        {hint && <span className="text-[10px] text-neutral-400 font-medium">{hint}</span>}
+      </div>
       {multiline ? (
         <textarea
           name={name}
           value={formData[name] || ''}
           onChange={handleChange}
           rows={4}
-          style={f.textarea}
           placeholder={placeholder}
+          className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black tracking-normal transition-colors"
         />
       ) : (
         <input
@@ -68,285 +75,259 @@ const SettingsAdmin = () => {
           name={name}
           value={formData[name] || ''}
           onChange={handleChange}
-          style={f.input}
           placeholder={placeholder}
-          onFocus={e => e.target.style.borderColor = '#6366f1'}
-          onBlur={e => e.target.style.borderColor = 'rgba(99,102,241,0.2)'}
+          className={`w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium px-3.5 py-3 focus:outline-none focus:border-black transition-colors ${uppercase ? 'uppercase tracking-wider' : ''}`}
         />
       )}
     </div>
   );
 
   return (
-    <div style={p.page}>
-      {/* Toast */}
+    <div className="space-y-8 animate-fade-in">
+      {/* Toast Notification */}
       {toastMsg && (
-        <div style={{
-          position: 'fixed', top: '20px', right: '24px', zIndex: 100,
-          padding: '12px 18px', borderRadius: '10px',
-          background: toastType === 'success' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-          border: `1px solid ${toastType === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-          color: toastType === 'success' ? '#34d399' : '#f87171',
-          fontSize: '13.5px', fontWeight: '500',
-          display: 'flex', alignItems: 'center', gap: '8px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
-        }}>
-          {toastType === 'success' ? '✓' : '✕'} {toastMsg}
+        <div
+          className={`fixed top-6 right-6 z-50 px-5 py-3 text-xs font-black tracking-wider uppercase border shadow-2xl flex items-center gap-2 animate-fade-in ${
+            toastType === 'success'
+              ? 'bg-black text-white border-neutral-700'
+              : 'bg-rose-600 text-white border-rose-800'
+          }`}
+        >
+          {toastType === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-white" />
+          )}
+          <span>{toastMsg}</span>
         </div>
       )}
 
-      <div style={p.header}>
-        <div>
-          <h1 style={p.title}>Settings</h1>
-          <p style={p.subtitle}>Manage your site configuration</p>
+      {/* ── Category Header (Zando Lookbook Style) ── */}
+      <div className="border border-neutral-200 bg-white p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-black text-white text-[10px] font-black tracking-widest uppercase">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>SYSTEM CONFIGURATION</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-black">
+              GLOBAL SITE SETTINGS
+            </h1>
+            <p className="text-xs text-neutral-500 font-medium">
+              Manage your brand identity, home page metrics, bio narrative, SEO, and social connectivity.
+            </p>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all duration-200 active:scale-95 disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'SAVING...' : 'SAVE CHANGES'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={p.tabsRow}>
-        {tabs.map(tab => (
+      {/* ── Category Navigation Tabs (Zando Pill Bar) ── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-neutral-200 pb-3">
+        {tabs.map((tab) => (
           <button
             key={tab.id}
-            style={{
-              ...p.tab,
-              ...(activeTab === tab.id ? p.tabActive : {}),
-            }}
             onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-150 active:scale-95 cursor-pointer ${
+              activeTab === tab.id
+                ? 'bg-black text-white shadow-xs'
+                : 'bg-white text-neutral-600 hover:text-black border border-neutral-300 hover:bg-neutral-100'
+            }`}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      <form onSubmit={handleSave}>
-        <div style={p.formCard}>
+      {/* ── Form Card ── */}
+      <form onSubmit={handleSave} className="space-y-6">
+        <div className="bg-white border border-neutral-200 p-6 sm:p-10 shadow-xs space-y-6">
           {activeTab === 'general' && (
-            <>
-              <p style={f.section}>Site Information</p>
-              <div style={f.grid}>
-                <Field label="Site Name" name="siteName" placeholder="LaolimHeang" />
-                <Field label="Contact Email" name="email" type="email" placeholder="hello@example.com" />
-                <Field label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
-                <Field label="Telegram Username" name="telegramUsername" placeholder="@yourusername" />
-                <Field label="Location" name="location" placeholder="Phnom Penh, Cambodia" />
+            <div className="space-y-6">
+              <div className="border-b border-neutral-200 pb-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                  BRAND & CONTACT INFORMATION
+                </h3>
               </div>
-              <Field label="Site Description" name="description" multiline placeholder="A brief description of your site..." hint="Used in email footers and about sections." />
-              <Field label="Footer Text" name="footerText" placeholder="© 2025 LaolimHeang. All rights reserved." />
-            </>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <Field label="Site Name" name="siteName" placeholder="LAOLIMHEANG" uppercase />
+                <Field label="Contact Email" name="email" type="email" placeholder="admin@laolimheang.space" />
+                <Field label="Phone / Telegram" name="phone" placeholder="+855 97 542 4470" />
+                <Field label="Telegram Username" name="telegramUsername" placeholder="laolimheang" />
+                <Field label="Primary Location" name="location" placeholder="Phnom Penh, Cambodia" />
+                <Field label="Copyright Statement" name="footerText" placeholder="© 2026 LAOLIMHEANG. ALL RIGHTS RESERVED." />
+              </div>
+              <Field
+                label="Site Tagline / Description"
+                name="description"
+                multiline
+                placeholder="Full-Stack Software Engineer & Digital Solutions Architect..."
+                hint="Used across meta descriptions and hero summaries."
+              />
+            </div>
           )}
 
           {activeTab === 'home' && (
-            <>
-              <p style={f.section}>Home Page Stats</p>
-              <div style={f.grid}>
-                <Field label="Stat 1 Value" name="stat1Value" placeholder="3+" />
-                <Field label="Stat 1 Label" name="stat1Label" placeholder="Years Experience" />
-                <Field label="Stat 2 Value" name="stat2Value" placeholder="20+" />
-                <Field label="Stat 2 Label" name="stat2Label" placeholder="Projects Built" />
-                <Field label="Stat 3 Value" name="stat3Value" placeholder="100%" />
-                <Field label="Stat 3 Label" name="stat3Label" placeholder="Client Satisfaction" />
+            <div className="space-y-6">
+              <div className="border-b border-neutral-200 pb-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                  FRONT-PAGE STATISTIC TELEMETRY
+                </h3>
               </div>
-            </>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                <Field label="Metric 1 Value" name="stat1Value" placeholder="3+" uppercase />
+                <Field label="Metric 1 Label" name="stat1Label" placeholder="Years of Experience" />
+                <Field label="Metric 2 Value" name="stat2Value" placeholder="20+" uppercase />
+                <Field label="Metric 2 Label" name="stat2Label" placeholder="Production Systems" />
+                <Field label="Metric 3 Value" name="stat3Value" placeholder="100%" uppercase />
+                <Field label="Metric 3 Label" name="stat3Label" placeholder="Client Satisfaction" />
+              </div>
+            </div>
           )}
 
           {activeTab === 'about' && (
-            <>
-              <p style={f.section}>About Me Section</p>
-              <Field label="About Me Text" name="aboutText" multiline placeholder="I am a passionate Full-Stack Developer..." hint="This text will be displayed on the public About page." />
-            </>
+            <div className="space-y-6">
+              <div className="border-b border-neutral-200 pb-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                  ABOUT ME / ENGINEER NARRATIVE
+                </h3>
+              </div>
+              <Field
+                label="About Narrative"
+                name="aboutText"
+                multiline
+                placeholder="Full-stack engineer dedicated to high-throughput architectures..."
+                hint="Separate paragraphs with blank lines. Displayed on public About page."
+              />
+            </div>
           )}
 
           {activeTab === 'seo' && (
-            <>
-              <p style={f.section}>SEO Configuration</p>
-              <div style={f.grid}>
-                <Field label="SEO Title" name="seoTitle" placeholder="LaolimHeang — Portfolio" />
-                <Field label="SEO Keywords" name="seoKeywords" placeholder="portfolio, developer, design" hint="Comma-separated keywords" />
+            <div className="space-y-6">
+              <div className="border-b border-neutral-200 pb-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                  SEARCH ENGINE OPTIMIZATION (SEO)
+                </h3>
               </div>
-              <Field label="Meta Description" name="seoDescription" multiline placeholder="Enter your meta description (recommended 150–160 characters)..." />
-            </>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <Field label="SEO Title Tag" name="seoTitle" placeholder="LaolimHeang — Full-Stack Engineer" />
+                <Field label="SEO Target Keywords" name="seoKeywords" placeholder="react, vite, tailwind, nodejs, postgresql" hint="Comma-separated" />
+              </div>
+              <Field
+                label="Meta Description"
+                name="seoDescription"
+                multiline
+                placeholder="High-performance distributed systems, modern web engineering, and cloud architecture..."
+              />
+            </div>
           )}
 
           {activeTab === 'social' && (
-            <>
-              <p style={f.section}>Social Media Links</p>
-              <div style={f.grid}>
+            <div className="space-y-6">
+              <div className="border-b border-neutral-200 pb-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                  SOCIAL & PROFESSIONAL CHANNELS
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {[
-                  { label: 'GitHub',    name: 'github',    ph: 'https://github.com/yourname' },
-                  { label: 'LinkedIn',  name: 'linkedin',  ph: 'https://linkedin.com/in/yourname' },
-                  { label: 'Twitter / X', name: 'twitter', ph: 'https://x.com/yourhandle' },
-                  { label: 'Facebook',  name: 'facebook',  ph: 'https://facebook.com/yourpage' },
-                  { label: 'Instagram', name: 'instagram', ph: 'https://instagram.com/yourhandle' },
-                  { label: 'Dribbble', name: 'dribbble',  ph: 'https://dribbble.com/yourname' },
-                  { label: 'Telegram', name: 'telegram',  ph: 'https://t.me/yourhandle' },
+                  { label: 'GitHub Repository URL', name: 'github', ph: 'https://github.com/heang-dev' },
+                  { label: 'LinkedIn Profile URL', name: 'linkedin', ph: 'https://linkedin.com/in/laolimheang' },
+                  { label: 'Twitter / X Profile', name: 'twitter', ph: 'https://x.com/laolimheang' },
+                  { label: 'Telegram Direct Channel', name: 'telegram', ph: 'https://t.me/laolimheang' },
+                  { label: 'Facebook Page URL', name: 'facebook', ph: 'https://facebook.com/laolimheang' },
+                  { label: 'Instagram Profile', name: 'instagram', ph: 'https://instagram.com/laolimheang' },
                 ].map(({ label, name, ph }) => (
                   <Field key={name} label={label} name={name} placeholder={ph} />
                 ))}
               </div>
-            </>
+            </div>
           )}
 
           {activeTab === 'footer' && (
-            <>
-              <p style={f.section}>Brand &amp; Tagline</p>
-              <div style={f.grid}>
+            <div className="space-y-6">
+              <div className="border-b border-neutral-200 pb-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                  FOOTER CONFIGURATION & CALL-TO-ACTION
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <Field
                   label="Footer Tagline"
                   name="footerTagline"
                   placeholder="Full-Stack Engineer & System Architect..."
-                  hint="Shown under your name. Falls back to Site Description if empty."
                 />
-              </div>
-
-              <p style={f.section}>Availability Status</p>
-              <div style={f.grid}>
-                <div style={f.fieldGroup}>
-                  <label style={f.label}>Show 'Available' Badge</label>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                    {[{ val: 'true', label: '✓ Visible' }, { val: 'false', label: '✕ Hidden' }].map(opt => (
-                      <button
-                        key={opt.val}
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, footerAvailable: opt.val !== 'false' }))}
-                        style={{
-                          padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
-                          cursor: 'pointer', border: '1px solid',
-                          background: String(formData.footerAvailable ?? true) === opt.val
-                            ? (opt.val === 'true' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)')
-                            : 'rgba(255,255,255,0.03)',
-                          borderColor: String(formData.footerAvailable ?? true) === opt.val
-                            ? (opt.val === 'true' ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.3)')
-                            : 'rgba(99,102,241,0.15)',
-                          color: String(formData.footerAvailable ?? true) === opt.val
-                            ? (opt.val === 'true' ? '#4ade80' : '#f87171')
-                            : '#64748b',
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 <Field
-                  label="Badge Label"
+                  label="Availability Badge Text"
                   name="footerAvailText"
-                  placeholder="Available for projects"
-                  hint="Text shown inside the availability badge."
+                  placeholder="AVAILABLE FOR NEW COMMISSIONS"
                 />
-              </div>
-
-              <p style={f.section}>Call-To-Action</p>
-              <div style={f.grid}>
                 <Field
                   label="CTA Button Text"
                   name="footerCtaText"
-                  placeholder="Start a Project"
-                  hint="Text on the button that links to /contact."
+                  placeholder="START A PROJECT"
                 />
                 <Field
-                  label="Contact Description"
+                  label="Contact Prompt Text"
                   name="footerContactDesc"
-                  placeholder="Have a project in mind? Let's build something great together."
-                  hint="Short text above the CTA button."
+                  placeholder="Have an engineering project in mind? Let's build something great together."
                 />
               </div>
 
-              <p style={f.section}>Technologies / Skills</p>
-              <Field
-                label="Skills List (comma-separated)"
-                name="footerSkills"
-                placeholder="React, Node.js, Firebase, TypeScript, MongoDB..."
-                hint="Each item becomes a pill tag. Leave empty to use the default list."
-              />
-
-              <p style={f.section}>Copyright</p>
-              <Field
-                label="Footer Copyright Text"
-                name="footerText"
-                placeholder={`© ${new Date().getFullYear()} LaolimHeang. All rights reserved.`}
-                hint="Displayed at the very bottom. Leave blank to auto-generate from Site Name."
-              />
-            </>
+              <div className="pt-2">
+                <label className="block text-xs font-black uppercase tracking-wider text-black mb-2">
+                  AVAILABILITY BADGE STATUS
+                </label>
+                <div className="flex items-center gap-3">
+                  {[
+                    { val: 'true', label: 'VISIBLE & ACTIVE' },
+                    { val: 'false', label: 'HIDDEN' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          footerAvailable: opt.val === 'true',
+                        }))
+                      }
+                      className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border transition-colors ${
+                        String(formData.footerAvailable ?? true) === opt.val
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white text-neutral-600 border-neutral-300 hover:text-black hover:bg-neutral-100'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Save button */}
-        <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px'}}>
+        {/* Bottom Save Action */}
+        <div className="flex justify-end pt-2">
           <button
             type="submit"
             disabled={saving}
-            style={{
-              ...p.saveBtn,
-              ...(saving ? { opacity: 0.7, cursor: 'not-allowed' } : {}),
-            }}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-[0.2em] transition-all duration-200 active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
           >
-            {saving ? (
-              <><span style={p.spinner} /> Saving...</>
-            ) : (
-              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="white" strokeWidth="2"/><polyline points="17 21 17 13 7 13 7 21" stroke="white" strokeWidth="2" strokeLinecap="round"/><polyline points="7 3 7 8 15 8" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>Save Changes</>
-            )}
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'SAVING CHANGES...' : 'SAVE ALL CONFIGURATIONS'}</span>
           </button>
         </div>
       </form>
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-};
-
-const p = {
-  page: { display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", maxWidth: '800px' },
-  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' },
-  title: { color: '#f1f5f9', fontSize: '24px', fontWeight: '700', margin: '0 0 4px 0', letterSpacing: '-0.02em' },
-  subtitle: { color: '#475569', fontSize: '13px', margin: 0 },
-  tabsRow: { display: 'flex', gap: '4px', background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(99,102,241,0.08)', borderRadius: '12px', padding: '5px' },
-  tab: {
-    padding: '8px 20px', borderRadius: '9px', border: 'none',
-    background: 'transparent', color: '#475569', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-    transition: 'all 0.15s',
-  },
-  tabActive: {
-    background: 'rgba(99,102,241,0.15)', color: '#818cf8',
-    border: '1px solid rgba(99,102,241,0.2)',
-  },
-  formCard: {
-    background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(99,102,241,0.08)',
-    borderRadius: '16px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '18px',
-  },
-  saveBtn: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    padding: '11px 24px',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    border: 'none', borderRadius: '10px', color: 'white',
-    fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-    boxShadow: '0 4px 15px rgba(99,102,241,0.35)',
-  },
-  spinner: {
-    display: 'inline-block', width: '13px', height: '13px',
-    border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white',
-    borderRadius: '50%', animation: 'spin 0.7s linear infinite',
-  },
-};
-
-const f = {
-  section: { color: '#475569', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px 0' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px,1fr))', gap: '16px' },
-  fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  label: { color: '#64748b', fontSize: '12.5px', fontWeight: '500' },
-  hint: { color: '#334155', fontSize: '11.5px', margin: 0 },
-  input: {
-    width: '100%', padding: '10px 14px',
-    background: 'rgba(15,15,30,0.7)', border: '1px solid rgba(99,102,241,0.2)',
-    borderRadius: '9px', color: '#e2e8f0', fontSize: '13.5px', outline: 'none',
-    transition: 'border-color 0.2s', boxSizing: 'border-box',
-  },
-  textarea: {
-    width: '100%', padding: '10px 14px',
-    background: 'rgba(15,15,30,0.7)', border: '1px solid rgba(99,102,241,0.2)',
-    borderRadius: '9px', color: '#e2e8f0', fontSize: '13.5px', outline: 'none',
-    resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
-  },
 };
 
 export default SettingsAdmin;

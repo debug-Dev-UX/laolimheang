@@ -1,10 +1,10 @@
 // useFirestore Hook
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import * as firestoreService from '../services/firebase/firestore';
 
 export const useFirestore = (collectionName) => {
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const getCollection = useCallback(async (constraints = []) => {
@@ -24,12 +24,19 @@ export const useFirestore = (collectionName) => {
     }
   }, [collectionName]);
 
+  // Automatically fetch on mount or collectionName change
+  useEffect(() => {
+    if (collectionName) {
+      getCollection();
+    }
+  }, [collectionName, getCollection]);
+
   const addDoc = useCallback(async (docData) => {
     setLoading(true);
     setError(null);
     try {
       const result = await firestoreService.addDocument(collectionName, docData);
-      setData(prev => [...prev, result]);
+      setData(prev => [result, ...prev.filter(item => item.id !== result.id)]);
       return result;
     } catch (err) {
       setError(err);
@@ -69,5 +76,18 @@ export const useFirestore = (collectionName) => {
     }
   }, [collectionName]);
 
-  return { data, loading, error, getCollection, addDoc, updateDoc, deleteDoc };
+  return {
+    data,
+    loading,
+    error,
+    getCollection,
+    fetchData: getCollection,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    // Aliases for admin modules
+    add: addDoc,
+    update: updateDoc,
+    remove: deleteDoc,
+  };
 };

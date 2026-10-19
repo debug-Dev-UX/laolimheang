@@ -12,13 +12,21 @@ export const AuthProvider = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(!!existingSession);
 
   useEffect(() => {
-    const unsubscribe = authService.subscribeToAuthChanges(authUser => {
-      setUser(authUser);
-      setIsAdmin(!!authUser);
+    const unsubscribe = authService.subscribeToAuthChanges((authUser) => {
       if (authUser) {
+        setUser(authUser);
+        setIsAdmin(true);
         setAdminSession(authUser);
-      } else if (!existingSession) {
-        clearAdminSession();
+      } else {
+        const session = getAdminSession();
+        if (session) {
+          setUser(session);
+          setIsAdmin(true);
+        } else {
+          setUser(null);
+          setIsAdmin(false);
+          clearAdminSession();
+        }
       }
       setLoading(false);
     });

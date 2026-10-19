@@ -62,12 +62,12 @@ function AppContent() {
   }, [settings]);
 
   return (
-    <div className={isAdminRoute ? 'min-h-screen' : 'min-h-screen flex flex-col bg-[#05050A] text-slate-200'}>
+    <div className={isAdminRoute ? 'min-h-screen' : 'min-h-screen flex flex-col bg-white text-neutral-900 antialiased font-sans'}>
       {!isAdminRoute && <Navbar />}
       <main className={isAdminRoute ? '' : 'flex-grow'}>
         <Routes>
           {/* Public Routes */}
-          <Route path={ROUTES.HOME} element={<Home3D />} />
+          <Route path={ROUTES.HOME} element={<Home />} />
           <Route path={ROUTES.ABOUT} element={<About />} />
           <Route path={ROUTES.SERVICES} element={<Services />} />
           <Route path={ROUTES.PORTFOLIO} element={<Portfolio />} />

@@ -37,6 +37,7 @@ export const useAuthState = () => {
 
 // useSignIn Hook
 export const useSignIn = () => {
+  const context = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -44,6 +45,10 @@ export const useSignIn = () => {
     setLoading(true);
     setError(null);
     try {
+      if (context && context.signIn) {
+        const user = await context.signIn(email, password);
+        return user;
+      }
       const user = await authService.signin(email, password);
       return user;
     } catch (err) {
@@ -51,6 +56,8 @@ export const useSignIn = () => {
         ? 'User not found'
         : err.code === 'auth/wrong-password'
         ? 'Wrong password'
+        : err.code === 'auth/invalid-credential'
+        ? 'Invalid email or password'
         : err.message || 'Login failed';
       setError(errorMessage);
       throw err;

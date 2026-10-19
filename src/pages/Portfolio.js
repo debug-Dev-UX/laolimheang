@@ -1,19 +1,17 @@
-// 3D Spatial Architecture & Portfolio Showcase
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { getCollection } from '../services/firebase/firestore';
-import { COLLECTIONS } from '../utils/constants';
-import ProjectShowcase3D from '../components/portfolio/ProjectShowcase3D';
-import ProjectCard3D from '../components/portfolio/ProjectCard3D';
-import ProjectInspectorModal3D from '../components/portfolio/ProjectInspectorModal3D';
-import CyberHUD, { playCyberTone } from '../components/common/CyberHUD';
+import { COLLECTIONS, ROUTES } from '../utils/constants';
+import { useAuth } from '../hooks/useAuth';
+import { Search, ExternalLink, Sliders, Check, ArrowRight, Plus, X } from 'lucide-react';
+import { FaGithub } from 'react-icons/fa';
 
 const Portfolio = () => {
+  const { isAdmin, user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('orbit'); // 'orbit' | 'grid'
   const [inspectedProject, setInspectedProject] = useState(null);
 
   useEffect(() => {
@@ -22,6 +20,7 @@ const Portfolio = () => {
 
   const loadProjects = async () => {
     try {
+      setLoading(true);
       const data = await getCollection(COLLECTIONS.PROJECTS);
       if (data && data.length > 0) {
         setProjects(data.sort((a, b) => (b.order || 0) - (a.order || 0)));
@@ -36,12 +35,14 @@ const Portfolio = () => {
     }
   };
 
-  const categories = projects.length > 0
-    ? ['All', ...new Set(projects.map((p) => p.category).filter(Boolean))]
-    : [];
+  const categories = [
+    'ALL',
+    ...new Set(projects.map((p) => (p.category || 'OTHER').toUpperCase()).filter(Boolean)),
+  ];
 
   const filtered = projects.filter((p) => {
-    const matchesCategory = filter === 'All' || p.category === filter;
+    const pCat = (p.category || 'OTHER').toUpperCase();
+    const matchesCategory = filter === 'ALL' || pCat === filter;
     const matchesSearch =
       !searchQuery ||
       p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -50,452 +51,359 @@ const Portfolio = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const handleInspect = (proj) => {
-    playCyberTone('click');
-    setInspectedProject(proj);
-  };
-
   return (
-    <div
-      style={{
-        background: '#030308',
-        minHeight: '100vh',
-        color: '#e2e8f0',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        position: 'relative',
-        overflowX: 'hidden',
-        paddingBottom: '100px',
-      }}
-    >
-      {/* Background radial ambient lights */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-150px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '900px',
-          height: '600px',
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, transparent 70%)',
-          filter: 'blur(100px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          top: '30%',
-          right: '-200px',
-          width: '600px',
-          height: '600px',
-          background: 'radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%)',
-          filter: 'blur(120px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-
-      <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '120px 24px 0', position: 'relative', zIndex: 1 }}>
-        {/* Header HUD Banner */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          style={{ textAlign: 'center', marginBottom: '48px' }}
-        >
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              borderRadius: '999px',
-              background: 'rgba(99, 102, 241, 0.12)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              color: '#818cf8',
-              fontSize: '12px',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: '16px',
-            }}
-          >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: '#818cf8',
-                boxShadow: '0 0 8px #818cf8',
-              }}
-            />
-            <span>3D Interactive Architecture Suite</span>
+    <div className="bg-white text-neutral-900 min-h-screen selection:bg-black selection:text-white">
+      {/* ── Category Header Bar (Zando Style) ── */}
+      <div className="border-b border-neutral-200 bg-[#f9fafb] py-8 sm:py-12 animate-fade-in">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-3">
+          <div className="flex items-center gap-2 text-[11px] font-bold tracking-widest uppercase text-neutral-500">
+            <Link to={ROUTES.HOME} className="hover:text-black">HOME</Link>
+            <span>/</span>
+            <span className="text-black">PROJECTS & ARCHITECTURE CATALOG</span>
           </div>
 
-          <h1
-            style={{
-              fontSize: 'clamp(36px, 5.5vw, 64px)',
-              fontWeight: 900,
-              color: '#f8fafc',
-              margin: '0 0 16px',
-              letterSpacing: '-0.03em',
-              lineHeight: 1.15,
-            }}
-          >
-            System <span style={{ background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Architecture</span> & Works
-          </h1>
-
-          <p
-            style={{
-              color: '#94a3b8',
-              fontSize: '17px',
-              maxWidth: '680px',
-              margin: '0 auto 36px',
-              lineHeight: 1.6,
-            }}
-          >
-            Explore high-availability distributed systems, neural networks, and interactive 3D spatial web applications crafted by Lao Limheang.
-          </p>
-
-          {/* HUD Stats Ribbon */}
-          <div
-            style={{
-              display: 'inline-flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: '24px',
-              padding: '16px 32px',
-              background: 'rgba(12, 14, 28, 0.6)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
-            }}
-          >
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#38bdf8' }}>{projects.length > 0 ? `${projects.length}+` : 0}</div>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Architectures</div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase text-black">
+                SYSTEMS INVENTORY & ARCHITECTURES
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-600 font-medium max-w-2xl mt-1">
+                Catalogue of production-grade web systems, distributed microservices, APIs, and modern frontends.
+              </p>
             </div>
-            <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#34d399' }}>99.99%</div>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Target Uptime</div>
-            </div>
-            <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#fbbf24' }}>60 FPS</div>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>WebGL Render</div>
-            </div>
-          </div>
-        </motion.div>
 
-        {/* View Switcher & Search Bar Control Ribbon: Only show if there are projects */}
-        {projects.length > 0 && (
-          <>
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '16px',
-                marginBottom: '32px',
-                background: 'rgba(12, 14, 28, 0.5)',
-                backdropFilter: 'blur(16px)',
-                padding: '14px 20px',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.07)',
-              }}
-            >
-              {/* Dual 3D View Switcher */}
-              <div
-                style={{
-                  display: 'flex',
-                  background: 'rgba(5, 7, 18, 0.8)',
-                  padding: '4px',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                }}
+            {isAdmin && user && (
+              <Link
+                to={ROUTES.ADMIN_PROJECTS}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors shrink-0"
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    playCyberTone('click');
-                    setViewMode('orbit');
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 18px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: viewMode === 'orbit' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
-                    color: viewMode === 'orbit' ? '#ffffff' : '#94a3b8',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: viewMode === 'orbit' ? '0 4px 15px rgba(99, 102, 241, 0.4)' : 'none',
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
-                    <path d="M2 12h20" />
-                  </svg>
-                  <span>3D Orbit Cylinder</span>
-                </button>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add / Manage Projects</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    playCyberTone('click');
-                    setViewMode('grid');
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 18px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: viewMode === 'grid' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
-                    color: viewMode === 'grid' ? '#ffffff' : '#94a3b8',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: viewMode === 'grid' ? '0 4px 15px rgba(99, 102, 241, 0.4)' : 'none',
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                  </svg>
-                  <span>3D Spatial Grid</span>
-                </button>
-              </div>
-
-              {/* Search Box */}
-              <div style={{ position: 'relative', minWidth: '260px' }}>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#64748b"
-                  strokeWidth="2.5"
-                  style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }}
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search architecture or tech..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px 10px 40px',
-                    background: 'rgba(5, 7, 18, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    color: '#f8fafc',
-                    fontSize: '13px',
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Category Filter Pills */}
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '8px',
-                marginBottom: '36px',
-                justifyContent: 'center',
-              }}
-            >
+      {/* ── Search & Filter Controls ── */}
+      <div className="sticky top-16 sm:top-20 z-30 bg-white/95 backdrop-blur-md border-b border-neutral-200 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            
+            {/* Category Filter Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 no-scrollbar">
               {categories.map((cat) => {
-                const isSelected = filter === cat;
-                const count =
-                  cat === 'All'
-                    ? projects.length
-                    : projects.filter((p) => p.category === cat).length;
-
+                const isActive = filter === cat;
                 return (
                   <button
                     key={cat}
-                    type="button"
-                    onClick={() => {
-                      playCyberTone('click');
-                      setFilter(cat);
-                    }}
-                    style={{
-                      padding: '7px 16px',
-                      borderRadius: '999px',
-                      border: isSelected
-                        ? '1.5px solid rgba(99, 102, 241, 0.6)'
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                      background: isSelected
-                        ? 'rgba(99, 102, 241, 0.2)'
-                        : 'rgba(12, 14, 28, 0.5)',
-                      color: isSelected ? '#c7d2fe' : '#94a3b8',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      transition: 'all 0.2s',
-                      boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.25)' : 'none',
-                    }}
+                    onClick={() => setFilter(cat)}
+                    className={`px-4 py-2 text-xs font-bold tracking-widest uppercase whitespace-nowrap transition-all duration-150 active:scale-95 ${
+                      isActive
+                        ? 'bg-black text-white shadow-sm'
+                        : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
+                    }`}
                   >
-                    <span>{cat}</span>
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        padding: '2px 7px',
-                        borderRadius: '999px',
-                        background: isSelected ? 'rgba(99, 102, 241, 0.5)' : 'rgba(255, 255, 255, 0.08)',
-                        color: isSelected ? '#ffffff' : '#64748b',
-                        fontWeight: 800,
-                      }}
-                    >
-                      {count}
-                    </span>
+                    {cat}
                   </button>
                 );
               })}
             </div>
-          </>
-        )}
 
-        {/* Content Section: 3D Orbit Carousel vs 3D Spatial Grid */}
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
-            Loading Architectures...
+            {/* Search Input Box with Icon */}
+            <div className="relative w-full lg:w-72">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="SEARCH PROJECTS & TECH..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-500 text-xs font-medium pl-9 pr-8 py-2.5 focus:outline-none focus:border-black uppercase tracking-wider"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-black transition-colors"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
           </div>
-        ) : projects.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '90px 24px',
-              background: 'rgba(12, 14, 28, 0.5)',
-              borderRadius: '24px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              maxWidth: '600px',
-              margin: '0 auto',
-            }}
-          >
-            <div style={{ fontSize: '40px', marginBottom: '16px' }}>🛰️</div>
-            <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#f8fafc', margin: '0 0 8px' }}>
-              No Architectures Documented
-            </h3>
-            <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
-              No portfolio projects have been added to the system architecture yet.
-            </p>
+        </div>
+      </div>
+
+      {/* ── Product Grid ── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 animate-fade-in">
+        {/* Result Counter */}
+        <div className="flex items-center justify-between mb-8 pb-3 border-b border-neutral-200">
+          <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+            SHOWING <strong className="text-black">{filtered.length}</strong> VERIFIED ARCHITECTURES
+          </span>
+          <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 hidden sm:inline">
+            ALL SYSTEMS MANAGED VIA ADMIN
+          </span>
+        </div>
+
+        {/* Skeleton Loading State */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div key={n} className="border border-neutral-200 bg-white p-6 space-y-4">
+                <div className="aspect-[16/10] skeleton-shimmer rounded-sm" />
+                <div className="h-5 skeleton-shimmer w-3/4 rounded-sm" />
+                <div className="h-4 skeleton-shimmer w-1/2 rounded-sm" />
+                <div className="h-16 skeleton-shimmer w-full rounded-sm" />
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '80px 20px',
-              background: 'rgba(12, 14, 28, 0.5)',
-              borderRadius: '24px',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-            }}
-          >
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', margin: '0 0 8px' }}>
-              No Architectures Found
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
-              Try adjusting your search query or switching category filters.
+          <div className="py-20 text-center border-2 border-dashed border-neutral-300 space-y-4">
+            <p className="text-lg font-black uppercase text-black">NO MATCHING ARCHITECTURES FOUND</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-wider">
+              {projects.length === 0 ? 'No projects have been added yet in the Firestore database.' : 'Try adjusting your search or category filter.'}
             </p>
-          </div>
-        ) : viewMode === 'orbit' ? (
-          <motion.div
-            key="orbit-view"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <ProjectShowcase3D projects={filtered} onInspect={handleInspect} />
-
-            {/* Quick Summary Grid Below 3D Orbit */}
-            <div style={{ marginTop: '56px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-                  Active Architectural Blueprints ({filtered.length})
-                </h2>
-                <span style={{ fontSize: '13px', color: '#818cf8', fontWeight: 700 }}>
-                  Click any card to inspect full telemetry
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                  gap: '24px',
-                }}
+            {isAdmin ? (
+              <Link
+                to={ROUTES.ADMIN_PROJECTS}
+                className="inline-block px-6 py-3 bg-black text-white text-xs font-bold tracking-widest uppercase hover:bg-neutral-800"
               >
-                {filtered.map((proj, idx) => (
-                  <ProjectCard3D
-                    key={proj.id || idx}
-                    project={proj}
-                    onInspect={handleInspect}
-                    index={idx}
-                  />
+                + ADD FIRST PROJECT IN ADMIN
+              </Link>
+            ) : (
+              <button
+                onClick={() => { setFilter('ALL'); setSearchQuery(''); }}
+                className="px-6 py-3 bg-black text-white text-xs font-bold tracking-widest uppercase hover:bg-neutral-800"
+              >
+                RESET ALL FILTERS
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {filtered.map((project) => (
+              <div
+                key={project.id}
+                className="bg-white border border-neutral-200 hover:border-black flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+              >
+                {/* Visual Area */}
+                <div className="relative bg-neutral-100 aspect-[16/10] overflow-hidden border-b border-neutral-200 flex flex-col justify-between p-4">
+                  <div className="flex items-center justify-between gap-2 z-10">
+                    <span className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-2 py-1">
+                      {project.category || 'SYSTEM'}
+                    </span>
+                    <span className="bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1">
+                      {project.status || 'VERIFIED'}
+                    </span>
+                  </div>
+
+                  {/* Watermark Graphic */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-10 font-black text-6xl sm:text-7xl text-neutral-900 pointer-events-none select-none tracking-tighter">
+                    {(project.title || '').slice(0, 4).toUpperCase()}
+                  </div>
+
+                  {/* Metrics Badge */}
+                  {project.metrics && project.metrics.length > 0 && (
+                    <div className="relative z-10 flex gap-1.5 flex-wrap">
+                      {project.metrics.slice(0, 2).map((m, idx) => (
+                        <span key={idx} className="bg-white/95 text-black text-[10px] font-bold px-2 py-0.5 border border-neutral-300">
+                          {m.label}: {m.value}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Details */}
+                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
+                      SYSTEM ARCHITECTURE
+                    </span>
+                    <h3 className="text-lg font-black uppercase tracking-tight text-black group-hover:underline">
+                      {project.title}
+                    </h3>
+                    {project.tagline && (
+                      <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                        {project.tagline}
+                      </p>
+                    )}
+                    <p className="text-xs text-neutral-600 leading-relaxed line-clamp-3 pt-1">
+                      {project.description}
+                    </p>
+                  </div>
+
+                  {/* Tech Tags */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex flex-wrap gap-1">
+                      {(project.technologies || []).slice(0, 5).map((tech) => (
+                        <span
+                          key={tech}
+                          className="px-2 py-0.5 bg-neutral-100 text-neutral-800 text-[10px] font-bold uppercase tracking-wider border border-neutral-200"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Action Bar */}
+                    <div className="pt-3 border-t border-neutral-100 flex items-center gap-2">
+                      <button
+                        onClick={() => setInspectedProject(project)}
+                        className="flex-1 py-2.5 bg-black text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-widest transition-colors duration-150 text-center active:scale-95"
+                      >
+                        QUICK VIEW
+                      </button>
+                      {project.liveUrl && (
+                        <a
+                          href={project.liveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors duration-150 flex items-center gap-1"
+                        >
+                          <span>DEMO</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* ── Zando Quick-View Modal ── */}
+      {inspectedProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            onClick={() => setInspectedProject(null)}
+          />
+          <div className="relative bg-white border-2 border-black max-w-2xl w-full p-6 sm:p-8 z-10 max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-slide-up">
+            <div className="flex items-start justify-between border-b border-neutral-200 pb-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+                  SYSTEM SPECIFICATION • {inspectedProject.category}
+                </span>
+                <h3 className="text-2xl font-black uppercase tracking-tight text-black mt-1">
+                  {inspectedProject.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setInspectedProject(null)}
+                className="p-1 text-black hover:text-neutral-500 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed">
+              {inspectedProject.description}
+            </p>
+
+            {/* Architecture Highlights */}
+            {inspectedProject.architecture && inspectedProject.architecture.length > 0 && (
+              <div className="bg-neutral-50 border border-neutral-200 p-4 space-y-2">
+                <span className="text-[11px] font-black uppercase tracking-widest text-black block">
+                  ARCHITECTURE SPECIFICATIONS:
+                </span>
+                <ul className="space-y-1.5 text-xs text-neutral-700">
+                  {inspectedProject.architecture.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-black shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Metrics Grid */}
+            {inspectedProject.metrics && (
+              <div className="grid grid-cols-3 gap-3">
+                {inspectedProject.metrics.map((m, idx) => (
+                  <div key={idx} className="border border-neutral-200 p-3 text-center bg-neutral-50">
+                    <span className="block text-base font-black text-black">{m.value}</span>
+                    <span className="text-[10px] font-bold uppercase text-neutral-500">{m.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Technologies */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-black uppercase tracking-widest text-neutral-400 block">
+                INTEGRATED STACK:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {(inspectedProject.technologies || []).map((t) => (
+                  <span key={t} className="px-2.5 py-1 bg-neutral-100 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300">
+                    {t}
+                  </span>
                 ))}
               </div>
             </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="grid-view"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-              gap: '28px',
-            }}
-          >
-            {filtered.map((proj, idx) => (
-              <ProjectCard3D
-                key={proj.id || idx}
-                project={proj}
-                onInspect={handleInspect}
-                index={idx}
-              />
-            ))}
-          </motion.div>
-        )}
-      </div>
 
-      {/* 3D Inspector Modal */}
-      {inspectedProject && (
-        <ProjectInspectorModal3D
-          project={inspectedProject}
-          onClose={() => setInspectedProject(null)}
-        />
+            {/* Modal Actions */}
+            <div className="pt-4 border-t border-neutral-200 flex flex-wrap gap-3">
+              {inspectedProject.liveUrl && (
+                <a
+                  href={inspectedProject.liveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-center py-3 bg-black text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <span>LAUNCH LIVE DEMO</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+              {inspectedProject.githubUrl && (
+                <a
+                  href={inspectedProject.githubUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-3 bg-white text-black hover:bg-neutral-100 text-xs font-bold uppercase tracking-widest border border-black transition-colors flex items-center gap-2 active:scale-95"
+                >
+                  <FaGithub className="w-4 h-4" />
+                  <span>GITHUB REPO</span>
+                </a>
+              )}
+              {isAdmin && (
+                <Link
+                  to={ROUTES.ADMIN_PROJECTS}
+                  className="px-4 py-3 bg-neutral-100 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 hover:bg-neutral-200"
+                >
+                  Edit in Admin
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Cyber HUD audio & controls */}
-      <CyberHUD />
+      {/* ── Bottom Commercial CTA ── */}
+      <section className="bg-black text-white py-14 px-4 text-center space-y-4">
+        <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">
+          LOOKING FOR A CUSTOM ENTERPRISE SOLUTION?
+        </h2>
+        <p className="text-xs sm:text-sm text-neutral-400 max-w-lg mx-auto font-medium">
+          I build tailored web applications, microservices, and databases for clients worldwide.
+        </p>
+        <div className="pt-2">
+          <Link
+            to={ROUTES.CONTACT}
+            className="inline-block px-8 py-3.5 bg-white text-black text-xs font-black tracking-widest uppercase hover:bg-neutral-200 transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
+          >
+            INQUIRE CUSTOM ARCHITECTURE &rarr;
+          </Link>
+        </div>
+      </section>
     </div>
   );
 };

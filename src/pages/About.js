@@ -1,43 +1,19 @@
-// 3D Spatial About Page with Holographic Dev Pass & 3D Skill Constellation
 import React, { useState, useEffect, useContext } from 'react';
-import { subscribeToCollection } from '../services/firebase/firestore';
-import { COLLECTIONS } from '../utils/constants';
-import { SettingsContext } from '../context/SettingsContext';
 import { Link } from 'react-router-dom';
-import { AboutPageSkeleton } from '../components/common/Skeleton';
-import TechGalaxy3D from '../components/about/TechGalaxy3D';
-import HoloDevPass3D from '../components/about/HoloDevPass3D';
-import CyberHUD from '../components/common/CyberHUD';
-
-const TECH_COLORS = {
-  React: '#61dafb',
-  Vue: '#42b883',
-  Angular: '#dd0031',
-  'Node.js': '#68a063',
-  Python: '#3776ab',
-  TypeScript: '#3178c6',
-  JavaScript: '#f7df1e',
-  Firebase: '#ffca28',
-  MongoDB: '#47a248',
-  TailwindCSS: '#38bdf8',
-  'Next.js': '#ffffff',
-  Docker: '#2496ed',
-  GraphQL: '#e10098',
-  HTML: '#e34f26',
-  CSS: '#1572b6',
-  PHP: '#777bb4',
-};
-
-const tc = (t) => TECH_COLORS[t] || '#6366f1';
+import { subscribeToCollection } from '../services/firebase/firestore';
+import { COLLECTIONS, ROUTES } from '../utils/constants';
+import { SettingsContext } from '../context/SettingsContext';
+import { useAuth } from '../hooks/useAuth';
+import { Shield, Cpu, Layers, Code, Check, Briefcase, Plus, Edit3 } from 'lucide-react';
 
 const About = () => {
-  const [mounted, setMounted] = useState(false);
+  const { settings, loading: settingsLoading } = useContext(SettingsContext);
+  const { isAdmin, user } = useAuth();
   const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { settings } = useContext(SettingsContext);
+  const siteName = settings?.siteName || 'LAOLIMHEANG';
 
   useEffect(() => {
-    setMounted(true);
     const unsubscribe = subscribeToCollection(COLLECTIONS.SKILLS, (data) => {
       if (data && data.length > 0) {
         setSkills(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
@@ -49,312 +25,215 @@ const About = () => {
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <AboutPageSkeleton />;
-
   const aboutParagraphs = settings?.aboutText
-    ? settings.aboutText.split('\\n').filter((p) => p.trim() !== '')
+    ? settings.aboutText.split('\n').filter((p) => p.trim() !== '')
     : [
-        'I am a passionate Full-Stack Developer & Spatial Web Engineer with deep expertise building modern, responsive, and ultra-high performance applications.',
-        'I specialize in the intersection of real-time 3D graphics (Three.js/WebGL), cloud architectures, and pixel-perfect user interfaces that convert and inspire.',
+        'I am a dedicated Full-Stack Software Engineer based in Phnom Penh, Cambodia, with a disciplined focus on architecting scalable digital platforms, performant web applications, and resilient cloud infrastructure.',
+        'With deep technical roots in modern React, Next.js, TypeScript, and Node.js backend systems, my engineering philosophy prioritizes clean data structures, sub-second latency, zero downtime, and minimalist, high-contrast user interfaces that convert.',
+        'Whether collaborating with early-stage venture founders to ship an MVP from scratch or refactoring enterprise microservices for scale, I deliver production code with speed, transparency, and architectural integrity.',
       ];
 
   return (
-    <div
-      style={{
-        background: '#030308',
-        minHeight: '100vh',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        color: '#e2e8f0',
-        overflowX: 'hidden',
-        position: 'relative',
-        paddingBottom: '100px',
-      }}
-    >
-      {/* Background radial ambient lights */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-100px',
-          right: '-100px',
-          width: '600px',
-          height: '600px',
-          background: 'radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%)',
-          filter: 'blur(120px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          top: '40%',
-          left: '-200px',
-          width: '700px',
-          height: '700px',
-          background: 'radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%)',
-          filter: 'blur(130px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-
-      {/* Header */}
-      <section style={{ position: 'relative', padding: '120px 4vw 20px', textAlign: 'center', zIndex: 1 }}>
-        <div
-          style={{
-            maxWidth: '680px',
-            margin: '0 auto',
-            opacity: mounted ? 1 : 0,
-            transform: mounted ? 'translateY(0)' : 'translateY(20px)',
-            transition: 'all 0.8s ease',
-          }}
-        >
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              borderRadius: '999px',
-              background: 'rgba(139, 92, 246, 0.12)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              color: '#a78bfa',
-              fontSize: '12px',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: '16px',
-            }}
-          >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: '#a78bfa',
-                boxShadow: '0 0 8px #a78bfa',
-              }}
-            />
-            <span>Verified Identity & Spatial Dossier</span>
+    <div className="bg-white text-neutral-900 min-h-screen selection:bg-black selection:text-white">
+      {/* ── Category Header (Zando Style) ── */}
+      <div className="border-b border-neutral-200 bg-[#f9fafb] py-8 sm:py-12 animate-fade-in">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-3">
+          <div className="flex items-center gap-2 text-[11px] font-bold tracking-widest uppercase text-neutral-500">
+            <Link to={ROUTES.HOME} className="hover:text-black">HOME</Link>
+            <span>/</span>
+            <span className="text-black">ENGINEER PROFILE</span>
           </div>
 
-          <h1
-            style={{
-              fontSize: 'clamp(36px, 5.5vw, 60px)',
-              fontWeight: 900,
-              color: '#f8fafc',
-              margin: '0 0 16px',
-              letterSpacing: '-0.03em',
-            }}
-          >
-            About{' '}
-            <span
-              style={{
-                background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              The Architect
-            </span>
-          </h1>
-          <p style={{ color: '#94a3b8', fontSize: '17px', lineHeight: 1.6, margin: 0 }}>
-            Bridging technical engineering rigour with fluid 3D spatial design.
-          </p>
-        </div>
-      </section>
-
-      {/* Content */}
-      <section
-        style={{
-          maxWidth: '1440px',
-          margin: '0 auto',
-          padding: '40px 4vw 80px',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        {/* Intro Grid: Left Biography, Right 3D Holo Developer Pass */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
-            gap: '60px',
-            alignItems: 'center',
-            marginBottom: '90px',
-          }}
-        >
-          <div>
-            <h2
-              style={{
-                fontSize: '34px',
-                fontWeight: 900,
-                color: '#f8fafc',
-                margin: '0 0 20px',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Hello, I'm <span style={{ color: '#818cf8' }}>{settings?.siteName || 'Lao Limheang'}</span>.
-            </h2>
-            {aboutParagraphs.map((p, i) => (
-              <p key={i} style={{ fontSize: '16px', lineHeight: '1.75', color: '#94a3b8', margin: '0 0 18px' }}>
-                {p}
-              </p>
-            ))}
-
-            {/* Quick credentials bullet points */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '16px',
-                margin: '28px 0 36px',
-              }}
-            >
-              <div
-                style={{
-                  padding: '16px',
-                  borderRadius: '16px',
-                  background: 'rgba(12, 14, 28, 0.6)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                }}
-              >
-                <div style={{ fontSize: '20px', fontWeight: 900, color: '#34d399', marginBottom: '4px' }}>3+ Years</div>
-                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Professional Experience</div>
-              </div>
-              <div
-                style={{
-                  padding: '16px',
-                  borderRadius: '16px',
-                  background: 'rgba(12, 14, 28, 0.6)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                }}
-              >
-                <div style={{ fontSize: '20px', fontWeight: 900, color: '#38bdf8', marginBottom: '4px' }}>25+ Projects</div>
-                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Shipped into Production</div>
-              </div>
-            </div>
-
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <Link
-                to="/contact"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '14px 32px',
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  borderRadius: '14px',
-                  color: 'white',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  boxShadow: '0 8px 30px rgba(99, 102, 241, 0.4)',
-                }}
-              >
-                <span>Initiate Project Consultation</span>
-                <span>→</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Right: 3D Holographic Developer Pass */}
-          <div>
-            <HoloDevPass3D />
-          </div>
-        </div>
-
-        {/* 3D Skill Constellation Section */}
-        <div style={{ marginBottom: '80px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-            <h2
-              style={{
-                fontSize: '34px',
-                fontWeight: 900,
-                color: '#f8fafc',
-                margin: '0 0 12px',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Interactive <span style={{ color: '#818cf8' }}>Tech Galaxy</span>
-            </h2>
-            <p style={{ color: '#94a3b8', fontSize: '16px', margin: 0 }}>
-              Rotate the 3D constellation sphere to explore core proficiencies in real-time space.
-            </p>
-          </div>
-
-          <TechGalaxy3D />
-        </div>
-
-        {/* Skills Categorical Breakdown Grid */}
-        {skills.length > 0 && (
-          <div>
-            <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-              <h3 style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', margin: '0 0 8px' }}>
-                Arsenal by Domain
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
-                Specialized tools, frameworks, and architecture patterns.
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase text-black">
+                ABOUT {siteName}
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-600 font-medium max-w-2xl mt-1">
+                Software engineer, systems architect, and digital product craftsman based in Phnom Penh, Cambodia.
               </p>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '24px',
-              }}
-            >
-              {skills.map((skillGroup) => (
-                <div
-                  key={skillGroup.category}
-                  style={{
-                    background: 'rgba(12, 14, 28, 0.65)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '20px',
-                    padding: '24px',
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  <h4
-                    style={{
-                      color: '#f8fafc',
-                      fontSize: '17px',
-                      fontWeight: 800,
-                      margin: '0 0 16px',
-                      letterSpacing: '-0.01em',
-                    }}
-                  >
-                    {skillGroup.category}
-                  </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {(skillGroup.items || []).map((item) => (
-                      <span
-                        key={item}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          background: `${tc(item)}18`,
-                          color: tc(item),
-                          border: `1px solid ${tc(item)}30`,
-                        }}
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
+            {isAdmin && user && (
+              <Link
+                to={ROUTES.ADMIN_SETTINGS}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors shrink-0"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Bio in Admin</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Editorial Lookbook & Bio Section ── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+          
+          {/* Left Column: Zando Editorial ID Pass Card */}
+          <div className="lg:col-span-5">
+            <div className="border-2 border-black p-6 sm:p-8 bg-neutral-50 shadow-xl space-y-6 transition-all duration-300 hover:-translate-y-1">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-200">
+                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
+                  DEVELOPER CREDENTIAL ID
+                </span>
+                <span className="bg-black text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5">
+                  #LH-2026
+                </span>
+              </div>
+
+              {/* Monogram Brand Block */}
+              <div className="bg-black text-white p-8 text-center space-y-2">
+                <div className="w-16 h-16 mx-auto rounded-full bg-white text-black font-black text-2xl flex items-center justify-center">
+                  LH
                 </div>
-              ))}
+                <h3 className="text-xl font-black uppercase tracking-widest pt-2">{siteName}</h3>
+                <p className="text-xs text-neutral-400 font-medium tracking-wider uppercase">
+                  FULL-STACK SOFTWARE ENGINEER
+                </p>
+              </div>
+
+              {/* Data Field Table */}
+              <div className="divide-y divide-neutral-200 text-xs">
+                <div className="py-2.5 flex justify-between">
+                  <span className="font-bold text-neutral-500 uppercase">LOCATION:</span>
+                  <span className="font-bold text-black">{settings?.location || 'Phnom Penh, Cambodia'}</span>
+                </div>
+                <div className="py-2.5 flex justify-between">
+                  <span className="font-bold text-neutral-500 uppercase">EXPERIENCE:</span>
+                  <span className="font-bold text-black">{settings?.stat1Value || '3+'} Years</span>
+                </div>
+                <div className="py-2.5 flex justify-between">
+                  <span className="font-bold text-neutral-500 uppercase">FOCUS:</span>
+                  <span className="font-bold text-black">React, Next.js, Node.js, Cloud</span>
+                </div>
+                <div className="py-2.5 flex justify-between">
+                  <span className="font-bold text-neutral-500 uppercase">COMMUNICATION:</span>
+                  <span className="font-bold text-black">English, Khmer</span>
+                </div>
+                <div className="py-2.5 flex justify-between">
+                  <span className="font-bold text-neutral-500 uppercase">STATUS:</span>
+                  <span className="font-bold text-emerald-600 uppercase">Available for Hire</span>
+                </div>
+              </div>
+
+              {/* Card CTA */}
+              <div className="pt-2">
+                <Link
+                  to={ROUTES.CONTACT}
+                  className="block text-center w-full py-3.5 bg-black hover:bg-neutral-800 text-white text-xs font-black tracking-widest uppercase transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
+                >
+                  START SYSTEM INQUIRY &rarr;
+                </Link>
+              </div>
             </div>
           </div>
-        )}
-      </section>
 
-      {/* Cyber HUD audio & controls */}
-      <CyberHUD />
+          {/* Right Column: Narrative Biography & Philosophy */}
+          <div className="lg:col-span-7 space-y-8">
+            <div className="space-y-4">
+              <span className="text-xs font-black tracking-widest uppercase text-neutral-500 block">
+                ENGINEERING PHILOSOPHY & BACKGROUND
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-black">
+                TURNING COMPLEX SYSTEM LOGIC INTO FAST, INTUITIVE EXPERIENCES
+              </h2>
+
+              <div className="space-y-4 text-sm sm:text-base text-neutral-700 leading-relaxed pt-2">
+                {aboutParagraphs.map((para, idx) => (
+                  <p key={idx}>{para}</p>
+                ))}
+              </div>
+            </div>
+
+            {/* Core Values Strip (Lucide Icons, No Emojis) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-neutral-200">
+              <div className="border border-neutral-300 p-4 bg-neutral-50 space-y-1.5 transition-all duration-200 hover:border-black">
+                <Cpu className="w-5 h-5 text-black mb-1" />
+                <span className="text-xs font-black uppercase tracking-wider text-black block">01 / PERFORMANCE</span>
+                <p className="text-xs text-neutral-600">Sub-second page loads and lightweight payloads across slow mobile networks.</p>
+              </div>
+
+              <div className="border border-neutral-300 p-4 bg-neutral-50 space-y-1.5 transition-all duration-200 hover:border-black">
+                <Layers className="w-5 h-5 text-black mb-1" />
+                <span className="text-xs font-black uppercase tracking-wider text-black block">02 / MODULARITY</span>
+                <p className="text-xs text-neutral-600">Reusable component design, strict TypeScript contracts, and clean file hierarchy.</p>
+              </div>
+
+              <div className="border border-neutral-300 p-4 bg-neutral-50 space-y-1.5 transition-all duration-200 hover:border-black">
+                <Shield className="w-5 h-5 text-black mb-1" />
+                <span className="text-xs font-black uppercase tracking-wider text-black block">03 / PRECISION</span>
+                <p className="text-xs text-neutral-600">Pixel-perfect layouts, responsive design, and intuitive interaction architecture.</p>
+              </div>
+            </div>
+
+            {/* Technical Skills Catalog */}
+            <div className="space-y-4 pt-6">
+              <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                <h3 className="text-lg font-black uppercase tracking-wider text-black">
+                  CORE TECHNICAL COMPETENCIES
+                </h3>
+                {isAdmin && user && (
+                  <Link to={ROUTES.ADMIN_SKILLS} className="text-xs font-bold text-black hover:underline uppercase tracking-wider flex items-center gap-1">
+                    <Edit3 className="w-3 h-3" /> Manage Skills
+                  </Link>
+                )}
+              </div>
+
+              {loading ? (
+                /* Skeleton Loading for Skills */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((n) => (
+                    <div key={n} className="border border-neutral-200 p-4 skeleton-shimmer h-28" />
+                  ))}
+                </div>
+              ) : skills.length === 0 ? (
+                <div className="border border-dashed border-neutral-300 p-6 text-center text-xs text-neutral-500 uppercase">
+                  No skills listed yet. Add them in the Admin Skills panel.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {skills.map((sk, idx) => (
+                    <div key={sk.id || idx} className="border border-neutral-200 p-4 bg-white transition-all duration-200 hover:border-black">
+                      <span className="text-xs font-black uppercase tracking-wider text-black block mb-2">
+                        {sk.category}
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {(sk.items || []).map((item) => (
+                          <span key={item} className="px-2 py-0.5 bg-neutral-100 text-black text-[10px] font-bold uppercase tracking-wider border border-neutral-200">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+      </main>
+
+      {/* ── Bottom CTA ── */}
+      <section className="bg-black text-white py-14 px-4 text-center space-y-4">
+        <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">
+          READY TO WORK TOGETHER?
+        </h2>
+        <p className="text-xs sm:text-sm text-neutral-400 max-w-lg mx-auto font-medium">
+          Let's discuss how my full-stack engineering skill set can add direct value to your team.
+        </p>
+        <div className="pt-2">
+          <Link
+            to={ROUTES.CONTACT}
+            className="inline-block px-8 py-3.5 bg-white text-black text-xs font-black tracking-widest uppercase hover:bg-neutral-200 transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
+          >
+            CONNECT WITH {siteName} &rarr;
+          </Link>
+        </div>
+      </section>
     </div>
   );
 };

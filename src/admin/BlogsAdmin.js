@@ -2,28 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { COLLECTIONS } from '../utils/constants';
 import { Base64UploadZone } from '../components/admin/Base64UploadZone';
+import {
+  BookOpen,
+  Plus,
+  Search,
+  Edit3,
+  Trash2,
+  X,
+  Sparkles,
+  CheckCircle2,
+  Calendar,
+  User,
+} from 'lucide-react';
 
-const css = `
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-  .admin-table { width:100%; border-collapse:collapse; min-width:800px; }
-  .admin-table thead tr { border-bottom:1px solid rgba(99,102,241,0.1); }
-  .admin-table th { padding:12px 16px; color:#334155; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; text-align:left; }
-  .admin-table tbody tr { border-bottom:1px solid rgba(99,102,241,0.05); transition:background 0.15s; }
-  .admin-table tbody tr:hover { background:rgba(99,102,241,0.04); }
-  .admin-table td { padding:14px 16px; }
-  .b-edit-btn { padding:5px 14px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.2); border-radius:7px; color:#818cf8; font-size:12px; font-weight:500; cursor:pointer; transition:background 0.15s; }
-  .b-edit-btn:hover { background:rgba(99,102,241,0.22); }
-  .b-del-btn { padding:5px 14px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.15); border-radius:7px; color:#f87171; font-size:12px; font-weight:500; cursor:pointer; transition:background 0.15s; }
-  .b-del-btn:hover { background:rgba(239,68,68,0.18); }
-  .b-inp:focus { border-color:#6366f1 !important; }
-  @media (max-width: 600px) { .modal-grid { grid-template-columns: 1fr !important; } }
-`;
-
-const CATEGORIES = ['Technology','Design','Business','Tutorial','Personal','Photography','Architecture','Other'];
-const emptyForm = { title:'', slug:'', content:'', category:'Technology', tags:'', author:'', thumbnail:'', published:true };
-
-const toSlug = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+const CATEGORIES = ['Technology', 'Design', 'Architecture', 'Tutorial', 'Personal', 'Other'];
+const emptyForm = { title: '', slug: '', content: '', category: 'Technology', tags: '', author: 'Lao Limheang', thumbnail: '', published: true };
+const toSlug = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 /* ─── Modal ─── */
 const Modal = ({ open, onClose, onSave, initial }) => {
@@ -52,8 +46,8 @@ const Modal = ({ open, onClose, onSave, initial }) => {
 
   const handle = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm(p => {
-      const next = { ...p, [name]: type==='checkbox' ? checked : value };
+    setForm((p) => {
+      const next = { ...p, [name]: type === 'checkbox' ? checked : value };
       if (name === 'title' && (!initial || !p.slug)) {
         next.slug = toSlug(value);
       }
@@ -72,12 +66,11 @@ const Modal = ({ open, onClose, onSave, initial }) => {
 
     try {
       setSaving(true);
-      
       let parsedTags = [];
       if (Array.isArray(form.tags)) {
         parsedTags = form.tags;
       } else if (typeof form.tags === 'string' && form.tags.trim()) {
-        parsedTags = form.tags.split(',').map(t => t.trim()).filter(Boolean);
+        parsedTags = form.tags.split(',').map((t) => t.trim()).filter(Boolean);
       }
 
       const generatedSlug = (form.slug || toSlug(form.title) || `post-${Date.now()}`).toLowerCase().trim();
@@ -96,111 +89,168 @@ const Modal = ({ open, onClose, onSave, initial }) => {
       await onSave(payload);
       onClose();
     } catch (err) {
-      console.error('Error in submit:', err);
-      setError(err?.message || 'Failed to save post. Please check connection or image size.');
+      console.error('Error saving blog post:', err);
+      setError(err?.message || 'Failed to save post.');
     } finally {
       setSaving(false);
     }
   };
 
-  const inp = { padding:'9px 13px', background:'rgba(15,15,30,0.8)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:'9px', color:'#e2e8f0', fontSize:'13.5px', outline:'none', boxSizing:'border-box', width:'100%', fontFamily:'inherit', transition:'border-color 0.2s' };
-
   return (
-    <div style={md.backdrop} onClick={e => { if(e.target===e.currentTarget) onClose(); }}>
-      <div style={md.box}>
-        <div style={md.head}>
-          <h2 style={md.title}>{initial ? 'Edit Post' : 'New Blog Post'}</h2>
-          <button style={md.xBtn} onClick={onClose}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-xs" onClick={onClose} />
+      <div className="relative bg-white border-2 border-black max-w-3xl w-full p-6 sm:p-8 z-10 max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-slide-up">
+        <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+              JOURNAL ARCHIVE
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black">
+              {initial ? 'EDIT EDITORIAL ARTICLE' : 'WRITE NEW ARTICLE'}
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-1 text-black hover:text-neutral-500">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
-          <div style={{ margin: '16px 24px 0', padding: '10px 16px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', color: '#f87171', fontSize: '13px' }}>
-            ⚠️ {error}
+          <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold uppercase tracking-wider">
+            {error}
           </div>
         )}
 
-        <form onSubmit={submit} style={md.form}>
-          {/* Title */}
-          <div style={md.field}>
-            <label style={md.lbl}>Post Title *</label>
-            <input className="b-inp" name="title" value={form.title} onChange={handle} required placeholder="Building Real-Time 3D Web Apps" style={inp} />
-          </div>
-
-          {/* Slug */}
-          <div style={md.field}>
-            <label style={md.lbl}>URL Slug</label>
-            <div style={{position:'relative'}}>
-              <span style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#334155',fontSize:'13px',pointerEvents:'none'}}>/blog/</span>
-              <input className="b-inp" name="slug" value={form.slug} onChange={handle} placeholder="building-real-time-3d-web-apps"
-                style={{...inp, paddingLeft:'52px'}} />
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                ARTICLE TITLE *
+              </label>
+              <input
+                name="title"
+                value={form.title}
+                onChange={handle}
+                required
+                placeholder="OPTIMIZING REACT 18 VIRTUAL DOM"
+                className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+              />
             </div>
-          </div>
 
-          {/* Row */}
-          <div style={md.grid2} className="modal-grid">
-            <div style={md.field}>
-              <label style={md.lbl}>Category</label>
-              <select name="category" value={form.category} onChange={handle} style={{...inp, cursor:'pointer'}}>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                URL SLUG
+              </label>
+              <input
+                name="slug"
+                value={form.slug}
+                onChange={handle}
+                placeholder="optimizing-react-18-virtual-dom"
+                className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                CATEGORY
+              </label>
+              <select
+                name="category"
+                value={form.category}
+                onChange={handle}
+                className="w-full bg-neutral-100 border border-neutral-300 text-black text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c.toUpperCase()}</option>
+                ))}
               </select>
             </div>
-            <div style={md.field}>
-              <label style={md.lbl}>Author</label>
-              <input className="b-inp" name="author" value={form.author} onChange={handle} placeholder="Lao Limheang" style={inp} />
-            </div>
-            <div style={md.field}>
-              <label style={md.lbl}>Thumbnail Image</label>
-              <Base64UploadZone
-                currentUrl={form.thumbnail}
-                onUploaded={url => setForm(p => ({ ...p, thumbnail: url }))}
+
+            <div className="space-y-1">
+              <label className="block text-xs font-black uppercase tracking-wider text-black">
+                AUTHOR NAME
+              </label>
+              <input
+                name="author"
+                value={form.author}
+                onChange={handle}
+                placeholder="Lao Limheang"
+                className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
               />
-              <input className="b-inp" name="thumbnail" value={form.thumbnail || ''} onChange={handle} placeholder="Or paste image URL directly..." style={{...inp, marginTop: 8}} />
             </div>
           </div>
 
-          {/* Tags */}
-          <div style={md.field}>
-            <label style={md.lbl}>Tags <span style={{color:'#64748b',fontWeight:'400'}}>(comma-separated)</span></label>
-            <input className="b-inp" name="tags" value={form.tags} onChange={handle}
-              placeholder="Three.js, React, WebGL, Architecture" style={inp} />
-            {form.tags && typeof form.tags === 'string' && (
-              <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginTop:'8px'}}>
-                {form.tags.split(',').map(t=>t.trim()).filter(Boolean).map((t,i) => (
-                  <span key={i} style={{fontSize:'11px',padding:'2px 9px',borderRadius:'20px',background:'rgba(16,185,129,0.1)',color:'#34d399',border:'1px solid rgba(16,185,129,0.2)',fontWeight:'600'}}># {t}</span>
-                ))}
-              </div>
-            )}
+          <div className="space-y-1">
+            <label className="block text-xs font-black uppercase tracking-wider text-black">
+              ARTICLE COVER / THUMBNAIL
+            </label>
+            <Base64UploadZone
+              currentUrl={form.thumbnail}
+              onUploaded={(url) => setForm((p) => ({ ...p, thumbnail: url }))}
+            />
+            <input
+              name="thumbnail"
+              value={form.thumbnail}
+              onChange={handle}
+              placeholder="Or paste direct image URL..."
+              className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black mt-2"
+            />
           </div>
 
-          {/* Content */}
-          <div style={md.field}>
-            <label style={md.lbl}>Content</label>
-            <textarea className="b-inp" name="content" value={form.content} onChange={handle} rows={6}
-              placeholder="Write your blog post content or Markdown here..." style={{...inp, resize:'vertical', lineHeight:'1.6'}} />
+          <div className="space-y-1">
+            <label className="block text-xs font-black uppercase tracking-wider text-black">
+              ARTICLE BODY CONTENT (MARKDOWN / TEXT)
+            </label>
+            <textarea
+              name="content"
+              value={form.content}
+              onChange={handle}
+              rows={8}
+              placeholder="Write your in-depth technical analysis or markdown content..."
+              className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black"
+            />
           </div>
 
-          {/* Publish toggle */}
-          <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',userSelect:'none'}}>
-            <div style={{position:'relative',width:'36px',height:'20px',flexShrink:0}} onClick={() => setForm(p=>({...p,published:!p.published}))}>
-              <div style={{position:'absolute',inset:0,borderRadius:'10px',background:form.published?'linear-gradient(135deg,#10b981,#059669)':'rgba(30,41,59,0.8)',transition:'background 0.2s',border:'1px solid rgba(16,185,129,0.2)'}} />
-              <div style={{position:'absolute',top:'2px',left:form.published?'18px':'2px',width:'16px',height:'16px',borderRadius:'50%',background:'white',transition:'left 0.2s',boxShadow:'0 1px 4px rgba(0,0,0,0.3)'}} />
-            </div>
-            <span style={{color:'#94a3b8',fontSize:'13px'}}>
-              {form.published ? <span style={{color:'#34d399'}}>● Published Immediately</span> : <span>○ Save as Draft</span>}
-            </span>
-          </label>
+          <div className="space-y-1">
+            <label className="block text-xs font-black uppercase tracking-wider text-black">
+              TAGS (COMMA-SEPARATED)
+            </label>
+            <input
+              name="tags"
+              value={form.tags}
+              onChange={handle}
+              placeholder="React, Microservices, Cloud, Docker"
+              className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
+            />
+          </div>
 
-          {/* Actions */}
-          <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',paddingTop:'8px'}}>
-            <button type="button" onClick={onClose}
-              style={{padding:'9px 20px',background:'transparent',border:'1px solid rgba(99,102,241,0.15)',borderRadius:'9px',color:'#94a3b8',fontSize:'13.5px',fontWeight:'500',cursor:'pointer'}}>
-              Cancel
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="blog-published"
+              name="published"
+              checked={form.published}
+              onChange={handle}
+              className="w-4 h-4 accent-black rounded-none cursor-pointer"
+            />
+            <label htmlFor="blog-published" className="text-xs font-bold uppercase tracking-wider text-black cursor-pointer">
+              PUBLISH ARTICLE IMMEDIATELY TO JOURNAL
+            </label>
+          </div>
+
+          <div className="pt-4 border-t border-neutral-200 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 border border-neutral-300 text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors"
+            >
+              CANCEL
             </button>
-            <button type="submit" disabled={saving}
-              style={{display:'flex',alignItems:'center',gap:'8px',padding:'9px 24px',background:'linear-gradient(135deg,#10b981,#059669)',border:'none',borderRadius:'9px',color:'white',fontSize:'13.5px',fontWeight:'700',cursor:saving?'not-allowed':'pointer',opacity:saving?0.7:1,boxShadow:'0 4px 14px rgba(16,185,129,0.35)'}}>
-              {saving ? <><span style={spinEl}/> Saving...</> : (initial ? 'Update Post' : 'Publish Post')}
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-8 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+            >
+              {saving ? 'SAVING...' : 'SAVE ARTICLE'}
             </button>
           </div>
         </form>
@@ -209,229 +259,224 @@ const Modal = ({ open, onClose, onSave, initial }) => {
   );
 };
 
-/* ─── Main ─── */
+/* ─── Main Component ─── */
 const BlogsAdmin = () => {
-  const { data: firestoreBlogs, loading, getCollection, addDoc, updateDoc, deleteDoc } = useFirestore(COLLECTIONS.BLOGS);
-  const [blogs, setBlogs] = useState([]);
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const { data: blogs, loading, add, update, remove } = useFirestore(COLLECTIONS.BLOGS);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [toast, setToast] = useState('');
 
-  useEffect(() => {
-    getCollection();
-  }, [getCollection]);
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
 
-  useEffect(() => {
-    if (firestoreBlogs && firestoreBlogs.length > 0) {
-      setBlogs(firestoreBlogs);
-    }
-  }, [firestoreBlogs]);
-
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
-
-  const filtered = blogs.filter(b => {
-    const matchSearch = b.title?.toLowerCase().includes(search.toLowerCase()) || b.category?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus==='all' || (filterStatus==='published'&&b.published) || (filterStatus==='draft'&&!b.published);
-    return matchSearch && matchStatus;
-  });
-
-  const handleSave = async (data) => {
+  const handleSave = async (payload) => {
     try {
       if (editItem) {
-        await updateDoc(editItem.id, data);
-        setBlogs(prev => prev.map(b => b.id === editItem.id ? { ...b, ...data, updatedAt: new Date().toISOString() } : b));
-        showToast('✓ Post updated successfully!');
+        await update(editItem.id, payload);
+        showToast('Article updated.');
       } else {
-        const res = await addDoc(data);
-        const newPost = res || { id: `blog-${Date.now()}`, ...data, createdAt: new Date().toISOString() };
-        setBlogs(prev => [newPost, ...prev]);
-        showToast('✓ Post published successfully!');
+        await add(payload);
+        showToast('Article published.');
       }
+      setModalOpen(false);
     } catch (err) {
-      console.warn('Firestore write warning, persisting locally:', err);
-      // Fallback local persistence so user never loses their post
-      const fallbackPost = {
-        id: editItem ? editItem.id : `local-blog-${Date.now()}`,
-        ...data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      if (editItem) {
-        setBlogs(prev => prev.map(b => b.id === editItem.id ? fallbackPost : b));
-        showToast('✓ Post updated!');
-      } else {
-        setBlogs(prev => [fallbackPost, ...prev]);
-        showToast('✓ Post published (Saved)!');
-      }
+      showToast('Error: ' + err.message);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this blog post?')) return;
+    if (!window.confirm('Delete this article?')) return;
     try {
-      await deleteDoc(id);
+      await remove(id);
+      showToast('Article deleted.');
     } catch (err) {
-      console.warn('Firestore delete error, removing locally:', err);
+      showToast('Error: ' + err.message);
     }
-    setBlogs(prev => prev.filter(b => b.id !== id));
-    showToast('Post deleted.');
   };
 
-  const published = blogs.filter(b=>b.published).length;
-  const drafts = blogs.length - published;
+  const filtered = (blogs || []).filter((b) => {
+    const matchStatus =
+      filterStatus === 'all' ||
+      (filterStatus === 'published' && b.published) ||
+      (filterStatus === 'draft' && !b.published);
+    const matchSearch =
+      !search ||
+      b.title?.toLowerCase().includes(search.toLowerCase()) ||
+      b.summary?.toLowerCase().includes(search.toLowerCase()) ||
+      b.category?.toLowerCase().includes(search.toLowerCase());
+    return matchStatus && matchSearch;
+  });
 
   return (
-    <div style={pg.page}>
-      <style>{css}</style>
-
-      {toast && <div style={pg.toast}>{toast}</div>}
-
-      {/* Header */}
-      <div style={pg.header}>
-        <div>
-          <h1 style={pg.title}>Blog Posts</h1>
-          <p style={pg.sub}>
-            <span style={{color:'#818cf8',fontWeight:'600'}}>{blogs.length}</span> total ·
-            <span style={{color:'#34d399',fontWeight:'600'}}> {published} published</span> ·
-            <span style={{color:'#64748b',fontWeight:'600'}}> {drafts} drafts</span>
-          </p>
+    <div className="space-y-8 animate-fade-in">
+      {toast && (
+        <div className="fixed top-6 right-6 z-50 bg-black text-white px-5 py-3 text-xs font-black tracking-wider uppercase border border-neutral-700 shadow-2xl flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toast}</span>
         </div>
-        <button style={pg.addBtn} onClick={() => { setEditItem(null); setModalOpen(true); }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
-          New Post
-        </button>
-      </div>
+      )}
 
-      {/* Toolbar */}
-      <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'center'}}>
-        {/* Search */}
-        <div style={{position:'relative',flex:'1',minWidth:'180px',maxWidth:'340px'}}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#475569',pointerEvents:'none'}}>
-            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-          </svg>
-          <input placeholder="Search posts..." value={search} onChange={e=>setSearch(e.target.value)} style={pg.sInput} />
-        </div>
-        {/* Status filter */}
-        {['all','published','draft'].map(s => (
-          <button key={s} onClick={()=>setFilterStatus(s)} style={{
-            padding:'7px 16px', borderRadius:'8px', border:'1px solid', fontSize:'12px', fontWeight:'500', cursor:'pointer',
-            background: filterStatus===s ? 'rgba(99,102,241,0.16)' : 'transparent',
-            borderColor: filterStatus===s ? 'rgba(99,102,241,0.32)' : 'rgba(99,102,241,0.1)',
-            color: filterStatus===s ? '#818cf8' : '#64748b',
-          }}>
-            {s==='all'?'All':s.charAt(0).toUpperCase()+s.slice(1)}
+      {/* Header Banner */}
+      <div className="border border-neutral-200 bg-white p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-black text-white text-[10px] font-black tracking-widest uppercase">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>TECHNICAL WRITING</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-black">
+              EDITORIAL ARTICLES & JOURNAL
+            </h1>
+            <p className="text-xs text-neutral-500 font-medium">
+              Author and publish in-depth technical writeups, architecture case studies, and engineering journal articles.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              setEditItem(null);
+              setModalOpen(true);
+            }}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all duration-200 active:scale-95 cursor-pointer shadow-xs shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>WRITE NEW ARTICLE</span>
           </button>
-        ))}
+        </div>
       </div>
 
-      {/* Table */}
-      <div style={pg.tableWrap}>
-        {loading && blogs.length === 0 ? (
-          <div style={pg.center}><div style={spinEl} /></div>
+      {/* Filter and Search Bar */}
+      <div className="bg-white border border-neutral-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          {['all', 'published', 'draft'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setFilterStatus(s)}
+              className={`px-3.5 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
+                filterStatus === s
+                  ? 'bg-black text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
+              }`}
+            >
+              {s === 'all' ? 'ALL POSTS' : s === 'published' ? 'PUBLISHED' : 'DRAFTS'}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full md:w-72">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input
+            placeholder="SEARCH ARTICLES..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium pl-9 pr-3 py-2 focus:outline-none focus:border-black uppercase tracking-wider"
+          />
+        </div>
+      </div>
+
+      {/* Table / List */}
+      <div className="bg-white border border-neutral-200 overflow-hidden shadow-xs">
+        {loading ? (
+          <div className="p-12 text-center text-xs font-bold uppercase tracking-widest text-neutral-400">
+            LOADING JOURNAL POSTS...
+          </div>
         ) : filtered.length === 0 ? (
-          <div style={pg.center}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style={{color:'#1e293b',marginBottom:'12px'}}>
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="1.5"/>
-              <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <p style={{color:'#64748b',margin:'0 0 16px',fontSize:'14px'}}>{search?'No posts match your search':'No blog posts yet'}</p>
-            {!search && <button style={pg.addBtn} onClick={() => { setEditItem(null); setModalOpen(true); }}>Write First Post</button>}
+          <div className="border-2 border-dashed border-neutral-300 m-6 p-16 text-center space-y-3">
+            <BookOpen className="w-12 h-12 text-neutral-400 mx-auto stroke-[1.5]" />
+            <p className="text-base font-black uppercase text-black">NO ARTICLES FOUND</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-wider">
+              {search ? 'Try a different search query.' : 'Write your first article to publish it to the journal.'}
+            </p>
+            {!search && (
+              <button
+                onClick={() => {
+                  setEditItem(null);
+                  setModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Write First Post</span>
+              </button>
+            )}
           </div>
         ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Post</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Author</th>
-                <th>Date</th>
-                <th style={{textAlign:'right'}}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(b => (
-                <tr key={b.id}>
-                  <td>
-                    <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-                      {b.thumbnail ? (
-                        <img src={b.thumbnail} alt="" style={{width:'40px',height:'40px',borderRadius:'8px',objectFit:'cover',flexShrink:0}} />
-                      ) : (
-                        <div style={{width:'40px',height:'40px',borderRadius:'8px',background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.2)',display:'flex',alignItems:'center',justifyContent:'center',color:'#818cf8',fontWeight:'700',fontSize:'14px',flexShrink:0}}>
-                          {b.title?.[0]?.toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <div style={{color:'#f8fafc',fontSize:'14px',fontWeight:'600',lineHeight:'1.3'}}>{b.title}</div>
-                        <div style={{color:'#475569',fontSize:'11.5px',fontFamily:'monospace',marginTop:'2px'}}>/blog/{b.slug}</div>
-                      </div>
+          <div className="divide-y divide-neutral-200">
+            {filtered.map((b) => (
+              <div
+                key={b.id}
+                className="p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[#fafafa] transition-colors"
+              >
+                <div className="flex items-start gap-4">
+                  {b.thumbnail ? (
+                    <img
+                      src={b.thumbnail}
+                      alt=""
+                      className="w-14 h-14 object-cover border border-neutral-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 bg-neutral-100 border border-neutral-200 flex items-center justify-center font-black text-base text-black shrink-0">
+                      {b.title?.[0]?.toUpperCase() || 'A'}
                     </div>
-                  </td>
-                  <td>
-                    <span style={{fontSize:'11.5px',padding:'3px 9px',borderRadius:'6px',background:'rgba(99,102,241,0.1)',color:'#a5b4fc',border:'1px solid rgba(99,102,241,0.2)',fontWeight:'500'}}>
-                      {b.category || 'General'}
-                    </span>
-                  </td>
-                  <td>
-                    {b.published ? (
-                      <span style={{fontSize:'12px',color:'#34d399',display:'flex',alignItems:'center',gap:'5px',fontWeight:'500'}}>
-                        <span style={{width:'6px',height:'6px',borderRadius:'50%',background:'#10b981'}} /> Published
+                  )}
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-black text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5">
+                        {b.category || 'ARTICLE'}
                       </span>
-                    ) : (
-                      <span style={{fontSize:'12px',color:'#64748b',display:'flex',alignItems:'center',gap:'5px'}}>
-                        <span style={{width:'6px',height:'6px',borderRadius:'50%',background:'#475569'}} /> Draft
+                      <span
+                        className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 ${
+                          b.published
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-neutral-200 text-neutral-700'
+                        }`}
+                      >
+                        {b.published ? 'PUBLISHED' : 'DRAFT'}
                       </span>
-                    )}
-                  </td>
-                  <td style={{color:'#94a3b8',fontSize:'13px'}}>{b.author || 'Lao Limheang'}</td>
-                  <td style={{color:'#475569',fontSize:'12px'}}>
-                    {b.createdAt ? new Date(b.createdAt?.toDate?.() || b.createdAt).toLocaleDateString() : 'Just now'}
-                  </td>
-                  <td>
-                    <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
-                      <button className="b-edit-btn" onClick={() => { setEditItem(b); setModalOpen(true); }}>Edit</button>
-                      <button className="b-del-btn" onClick={() => handleDelete(b.id)}>Delete</button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+                    <h3 className="text-base font-black uppercase tracking-tight text-black">
+                      {b.title}
+                    </h3>
+                    <p className="text-xs text-neutral-500 font-mono">
+                      /blog/{b.slug}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 self-end md:self-auto shrink-0">
+                  <button
+                    onClick={() => {
+                      setEditItem(b);
+                      setModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-black hover:text-white text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>EDIT</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(b.id)}
+                    className="p-2 text-neutral-400 hover:text-rose-600 border border-neutral-200 hover:border-rose-300 transition-colors"
+                    title="Delete article"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleSave} initial={editItem} />
     </div>
   );
-};
-
-const spinEl = { display:'inline-block',width:'14px',height:'14px',border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'white',borderRadius:'50%',animation:'spin 0.8s linear infinite' };
-
-const md = {
-  backdrop: { position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px' },
-  box: { width:'100%',maxWidth:'680px',background:'rgba(12,14,28,0.96)',border:'1px solid rgba(99,102,241,0.25)',borderRadius:'20px',boxShadow:'0 24px 60px rgba(0,0,0,0.8)',overflow:'hidden',maxHeight:'90vh',display:'flex',flexDirection:'column' },
-  head: { display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 24px',borderBottom:'1px solid rgba(99,102,241,0.1)' },
-  title: { margin:0,color:'#f1f5f9',fontSize:'17px',fontWeight:'700' },
-  xBtn: { background:'transparent',border:'none',color:'#475569',cursor:'pointer',padding:'4px',display:'flex',borderRadius:'6px' },
-  form: { padding:'20px 24px',overflowY:'auto',display:'flex',flexDirection:'column',gap:'16px' },
-  field: { display:'flex',flexDirection:'column',gap:'6px' },
-  lbl: { color:'#94a3b8',fontSize:'12px',fontWeight:'600' },
-  grid2: { display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px' },
-};
-
-const pg = {
-  page: { padding:'32px',maxWidth:'1200px',margin:'0 auto',display:'flex',flexDirection:'column',gap:'24px' },
-  header: { display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:'16px' },
-  title: { margin:'0 0 6px',color:'#f1f5f9',fontSize:'26px',fontWeight:'800',letterSpacing:'-0.02em' },
-  sub: { margin:0,color:'#475569',fontSize:'13px' },
-  addBtn: { display:'inline-flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:'10px',color:'white',fontSize:'13.5px',fontWeight:'600',cursor:'pointer',boxShadow:'0 4px 16px rgba(99,102,241,0.35)' },
-  sInput: { width:'100%',padding:'8px 12px 8px 34px',background:'rgba(15,15,30,0.8)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:'8px',color:'#e2e8f0',fontSize:'13px',outline:'none',boxSizing:'border-box' },
-  tableWrap: { background:'rgba(12,14,28,0.7)',border:'1px solid rgba(99,102,241,0.12)',borderRadius:'16px',overflowX:'auto',boxShadow:'0 8px 32px rgba(0,0,0,0.4)' },
-  center: { padding:'60px 20px',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center' },
-  toast: { position:'fixed',bottom:'28px',right:'28px',background:'rgba(16,185,129,0.95)',color:'white',padding:'12px 22px',borderRadius:'12px',fontSize:'14px',fontWeight:'600',boxShadow:'0 8px 24px rgba(0,0,0,0.5)',zIndex:2000 },
 };
 
 export default BlogsAdmin;

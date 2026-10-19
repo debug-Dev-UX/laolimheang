@@ -1,452 +1,619 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { getCollection } from '../services/firebase/firestore';
-import { COLLECTIONS } from '../utils/constants';
+import { COLLECTIONS, ROUTES } from '../utils/constants';
 import { SettingsContext } from '../context/SettingsContext';
-import { HomePageSkeleton } from '../components/common/Skeleton';
-
-const TECH_COLORS = {
-  React:'#61dafb',Vue:'#42b883',Angular:'#dd0031','Node.js':'#68a063',
-  Python:'#3776ab',TypeScript:'#3178c6',JavaScript:'#f7df1e',
-  Firebase:'#ffca28',MongoDB:'#47a248',TailwindCSS:'#38bdf8',
-  'Next.js':'#ffffff',Docker:'#2496ed',GraphQL:'#e10098',
-};
-const tc = (t) => TECH_COLORS[t] || '#818cf8';
-
-// --- Data Structure Visualizer Component (Canvas) ---
-const NetworkVisualizer = () => {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let width = canvas.width = canvas.parentElement.clientWidth;
-    let height = canvas.height = canvas.parentElement.clientHeight;
-
-    const nodes = [];
-    const numNodes = 35;
-    for (let i = 0; i < numNodes; i++) {
-      nodes.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        vx: (Math.random() - 0.5) * 1.5,
-        vy: (Math.random() - 0.5) * 1.5,
-        radius: Math.random() * 2 + 1.5,
-      });
-    }
-
-    let animationFrameId;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, width, height);
-      
-      // Update nodes
-      nodes.forEach(node => {
-        node.x += node.vx;
-        node.y += node.vy;
-        if (node.x < 0 || node.x > width) node.vx *= -1;
-        if (node.y < 0 || node.y > height) node.vy *= -1;
-      });
-
-      // Draw connections
-      ctx.lineWidth = 0.5;
-      for (let i = 0; i < numNodes; i++) {
-        for (let j = i + 1; j < numNodes; j++) {
-          const dx = nodes[i].x - nodes[j].x;
-          const dy = nodes[i].y - nodes[j].y;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          if (dist < 120) {
-            ctx.beginPath();
-            ctx.moveTo(nodes[i].x, nodes[i].y);
-            ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.strokeStyle = `rgba(99, 102, 241, ${1 - dist/120})`;
-            ctx.stroke();
-          }
-        }
-      }
-
-      // Draw nodes
-      nodes.forEach(node => {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#818cf8';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#818cf8';
-        ctx.fill();
-        ctx.shadowBlur = 0; // Reset
-      });
-
-      animationFrameId = requestAnimationFrame(draw);
-    };
-
-    draw();
-
-    const handleResize = () => {
-      if (!canvas.parentElement) return;
-      width = canvas.width = canvas.parentElement.clientWidth;
-      height = canvas.height = canvas.parentElement.clientHeight;
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />;
-};
-
-// --- Tilt Card Component ---
-const TiltCard = ({ children, style, className }) => {
-  const cardRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    const card = cardRef.current;
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = ((y - centerY) / centerY) * -10;
-    const rotateY = ((x - centerX) / centerX) * 10;
-    
-    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
-  };
-
-  const handleMouseLeave = () => {
-    const card = cardRef.current;
-    if (!card) return;
-    card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-  };
-
-  return (
-    <div 
-      ref={cardRef} 
-      className={className}
-      style={{ ...style, transition: 'transform 0.1s ease-out' }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-    >
-      {children}
-    </div>
-  );
-};
-
+import { useAuth } from '../hooks/useAuth';
+import {
+  Code,
+  Server,
+  Cpu,
+  Layers,
+  ArrowRight,
+  ExternalLink,
+  Check,
+  Sparkles,
+  Sliders,
+  Terminal,
+  Database,
+  Globe,
+  Edit3
+} from 'lucide-react';
+import { FaGithub, FaTelegram } from 'react-icons/fa';
 
 const Home = () => {
+  const { settings, loading: settingsLoading } = useContext(SettingsContext);
+  const { isAdmin, user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [services, setServices] = useState([]);
-  const [mounted, setMounted] = useState(false);
+  const [skills, setSkills] = useState([]);
+  const [activeFilter, setActiveFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
-  const { settings } = useContext(SettingsContext);
 
   useEffect(() => {
-    setMounted(true);
+    let isMounted = true;
     Promise.allSettled([
       getCollection(COLLECTIONS.PROJECTS),
       getCollection(COLLECTIONS.SERVICES),
-    ]).then(([pr, sr]) => {
-      if (pr.status === 'fulfilled') setProjects(pr.value.filter(p => p.featured).slice(0, 3));
-      if (sr.status === 'fulfilled') setServices(sr.value.filter(s => s.featured).slice(0, 3));
+      getCollection(COLLECTIONS.SKILLS),
+    ]).then(([pr, sr, sk]) => {
+      if (!isMounted) return;
+      if (pr.status === 'fulfilled' && pr.value) {
+        setProjects(pr.value.sort((a, b) => (b.order || 0) - (a.order || 0)));
+      }
+      if (sr.status === 'fulfilled' && sr.value) {
+        setServices(sr.value);
+      }
+      if (sk.status === 'fulfilled' && sk.value) {
+        setSkills(sk.value.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      }
       setLoading(false);
+    }).catch(() => {
+      if (isMounted) setLoading(false);
     });
+
+    return () => { isMounted = false; };
   }, []);
 
-  if (loading) return <HomePageSkeleton />;
+  const categories = ['ALL', ...new Set(projects.map((p) => (p.category || 'OTHER').toUpperCase()).filter(Boolean))];
 
-  const stats = settings ? [
-    { value: settings.stat1Value || '3+', label: settings.stat1Label || 'Years Experience' },
-    { value: settings.stat2Value || '20+', label: settings.stat2Label || 'Projects Built' },
-    { value: settings.stat3Value || '100%', label: settings.stat3Label || 'Client Satisfaction' },
-  ] : [];
+  const filteredProjects = projects.filter((p) => {
+    if (activeFilter === 'ALL') return true;
+    return (p.category || '').toUpperCase() === activeFilter;
+  });
+
+  const siteName = settings?.siteName || 'LAOLIMHEANG';
+  const siteTagline = settings?.siteDescription || 'Full-Stack Software Engineer & Digital Solutions Architect';
+  const telegram = settings?.telegramUsername || 'laolimheang';
+
+  const stats = [
+    { value: settings?.stat1Value || '3+', label: settings?.stat1Label || 'Years of Experience' },
+    { value: settings?.stat2Value || '20+', label: settings?.stat2Label || 'Projects Built' },
+    { value: settings?.stat3Value || '100%', label: settings?.stat3Label || 'Client Satisfaction' },
+    { value: '<50ms', label: 'Average Response Time' },
+  ];
 
   return (
-    <div style={s.page}>
-      <style>{css}</style>
-
-      {/* ── HERO ── */}
-      <section style={s.hero}>
-        {/* Abstract Data Structure Background */}
-        <div style={{position:'absolute', inset:0, zIndex:0, opacity:0.6}}>
-          <NetworkVisualizer />
-        </div>
-        
-        {/* Orbs */}
-        <div style={{...s.orb, width:'500px', height:'500px', background:'radial-gradient(circle,rgba(99,102,241,0.15),transparent 70%)', top:'-100px', left:'-150px'}} />
-        <div style={{...s.orb, width:'400px', height:'400px', background:'radial-gradient(circle,rgba(139,92,246,0.12),transparent 70%)', top:'50px', right:'-100px'}} />
-
-        <div style={s.heroContent}>
-          <div style={{...s.heroBadge, opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(12px)', transition:'all 0.6s ease'}}>
-            <span style={s.heroBadgeDot} />
-            Data-Driven & Algorithmic Excellence
+    <div className="bg-white text-neutral-900 selection:bg-black selection:text-white">
+      
+      {/* ── Admin Shortcut Quick Bar (When Logged in as Admin) ── */}
+      {isAdmin && user && (
+        <div className="bg-neutral-900 text-white text-xs py-2 px-4 border-b border-neutral-700 animate-fade-in flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="font-bold tracking-wider uppercase text-[11px]">ADMIN CONTROL MODE ACTIVE</span>
           </div>
-
-          <h1 style={{...s.heroTitle, opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(20px)', transition:'all 0.7s ease 0.1s'}}>
-            Hi, I'm <span style={s.heroGradient}>{settings?.siteName || 'LaolimHeang'}</span>
-            <br />Full-Stack Engineer
-          </h1>
-
-          <p style={{...s.heroSub, opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(20px)', transition:'all 0.7s ease 0.2s'}}>
-            I architect and engineer premium digital systems — focusing on scalability, robust data structures, and pixel-perfect interfaces. Turning complex logic into elegant solutions.
-          </p>
-
-          <div style={{...s.heroActions, opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(20px)', transition:'all 0.7s ease 0.3s'}}>
-            <Link to="/portfolio" style={s.heroCta} className="hero-cta">
-              Explore Architecture
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <div className="flex items-center gap-3">
+            <Link to={ROUTES.ADMIN_SETTINGS} className="hover:underline flex items-center gap-1 text-[11px] text-neutral-300 hover:text-white">
+              <Edit3 className="w-3 h-3" /> Edit Site Settings
             </Link>
-            <Link to="/contact" style={s.heroGhost} className="hero-ghost">
-              Initialize Connection
+            <span>•</span>
+            <Link to={ROUTES.ADMIN_PROJECTS} className="hover:underline flex items-center gap-1 text-[11px] text-neutral-300 hover:text-white">
+              <Edit3 className="w-3 h-3" /> Manage Projects
+            </Link>
+            <span>•</span>
+            <Link to={ROUTES.ADMIN_SERVICES} className="hover:underline flex items-center gap-1 text-[11px] text-neutral-300 hover:text-white">
+              <Edit3 className="w-3 h-3" /> Manage Services
             </Link>
           </div>
-
-          {/* Dynamic Stats */}
-          <div style={{...s.heroStats, opacity: mounted ? 1 : 0, transition:'all 0.7s ease 0.5s'}}>
-            {stats.map((stat, i) => (
-              <div key={i} style={s.statItem}>
-                <span style={s.statVal}>{stat.value}</span>
-                <span style={s.statLbl}>{stat.label}</span>
-              </div>
-            ))}
-          </div>
         </div>
+      )}
 
-        {/* Hero visual: Graph/Code Card Hybrid */}
-        <TiltCard style={{...s.heroVisual, opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(30px)', transition:'all 0.9s ease 0.2s'}}>
-          <div style={s.codeCard}>
-            <div style={s.cardHeader}>
-              <div style={{...s.dot, background:'#ff5f57'}} />
-              <div style={{...s.dot, background:'#ffbd2e'}} />
-              <div style={{...s.dot, background:'#28c840'}} />
-              <span style={s.cardFile}>binary_tree.ts</span>
-            </div>
-            <div style={s.code}>
-              <div><span style={s.kw}>class</span> <span style={s.fn}>Node</span>&lt;<span style={s.key}>T</span>&gt; {'{'}</div>
-              <div style={{paddingLeft:'16px'}}><span style={s.kw}>constructor</span>(<span style={s.kw}>public</span> value: <span style={s.key}>T</span>) {'{}'}</div>
-              <div style={{paddingLeft:'16px'}}><span style={s.kw}>public</span> left: <span style={s.fn}>Node</span>&lt;<span style={s.key}>T</span>&gt; | <span style={s.key}>null</span> = <span style={s.key}>null</span>;</div>
-              <div style={{paddingLeft:'16px'}}><span style={s.kw}>public</span> right: <span style={s.fn}>Node</span>&lt;<span style={s.key}>T</span>&gt; | <span style={s.key}>null</span> = <span style={s.key}>null</span>;</div>
-              <div>{'}'}</div>
-              <br/>
-              <div><span style={s.kw}>const</span> <span style={s.fn}>engineer</span> = <span style={s.kw}>new</span> <span style={s.fn}>Node</span>(</div>
-              <div style={{paddingLeft:'16px'}}><span style={s.str}>"Problem Solver"</span></div>
-              <div>);</div>
-              <div style={{marginTop:'8px', color:'#334155'}}>
-                <span style={s.kw}>export default</span> engineer;
-                <span style={s.cursor}>|</span>
+      {/* ── HERO BANNER: EDITORIAL LOOKBOOK STYLE (ZANDO AESTHETIC) ── */}
+      <section className="border-b border-neutral-200 bg-[#f9fafb] relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 lg:py-24 animate-slide-up">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            
+            {/* Left Headline & Editorial Description */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Category Drop Indicator */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-black text-white text-[11px] font-bold tracking-[0.2em] uppercase shadow-xs">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>NEW COLLECTION 2026</span>
+                <span>•</span>
+                <span>PRODUCTION SYSTEMS</span>
+              </div>
+
+              {/* Huge Bold Monochromatic Headline */}
+              <div className="space-y-3">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight uppercase text-black leading-[1.08]">
+                  ENGINEERED FOR <br />
+                  <span className="underline decoration-4 underline-offset-8 decoration-black">
+                    PERFORMANCE & SCALE
+                  </span>
+                </h1>
+                <p className="text-base sm:text-lg font-medium text-neutral-600 max-w-xl leading-relaxed pt-2">
+                  Full-stack software engineering by <strong className="text-black font-bold">{siteName}</strong>. Developing resilient web platforms, high-throughput microservices, and pixel-perfect digital user experiences.
+                </p>
+              </div>
+
+              {/* Action Buttons: High-Contrast Zando Retail CTAs */}
+              <div className="flex flex-wrap items-center gap-4 pt-3">
+                <a
+                  href="#catalog"
+                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-black hover:bg-neutral-800 text-white text-xs font-bold tracking-[0.2em] uppercase transition-all duration-200 hover:-translate-y-0.5 shadow-sm active:scale-95"
+                >
+                  <span>EXPLORE WORK</span>
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+
+                <Link
+                  to={ROUTES.CONTACT}
+                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white hover:bg-neutral-50 text-black text-xs font-bold tracking-[0.2em] uppercase border-2 border-black transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
+                >
+                  <span>START AN INQUIRY</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+
+              {/* Key Trust Specs (Zando Quality Badges) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-8 border-t border-neutral-200">
+                {stats.map((st, i) => (
+                  <div key={i} className="border-l-2 border-black pl-3 transition-transform duration-200 hover:translate-x-1">
+                    <span className="block text-2xl font-black text-black">{st.value}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{st.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-          {/* Floating tech badges */}
-          {['Algorithms','Architecture','System Design','O(1)'].map((tech, i) => (
-            <div key={tech} style={{...s.floatBadge, ...floatPositions[i]}}>
-              <span style={{color: '#c084fc', fontSize:'10px', fontWeight:'700'}}>{tech}</span>
-            </div>
-          ))}
-        </TiltCard>
-      </section>
 
-      {/* ── FEATURED PROJECTS ── */}
-      {projects.length > 0 && (
-        <section style={s.section}>
-          <div style={s.sectionHead}>
-            <span style={s.sectionLabel}>Execution</span>
-            <h2 style={s.sectionTitle}>Featured Architectures</h2>
-            <p style={s.sectionSub}>A selection of my best engineered systems</p>
-          </div>
-          <div style={s.projectGrid}>
-            {projects.map((proj, i) => {
-              const techs = proj.technologies || [];
-              const grad = gradients[i % gradients.length];
-              return (
-                <TiltCard key={proj.id} className="proj-card" style={s.projCard}>
-                  {proj.imageUrl ? (
-                    <div style={{...s.projBanner, background: `url(${proj.imageUrl}) center/cover`}}>
-                      <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent,rgba(12,12,26,0.95))',pointerEvents:'none'}} />
-                      {proj.featured && <span style={s.featBadge}>★ Featured</span>}
+            {/* Right Editorial Lookbook Card / Feature Showcase */}
+            <div className="lg:col-span-5">
+              <div className="bg-white border-2 border-black p-6 sm:p-8 shadow-2xl relative transition-all duration-300 hover:-translate-y-1">
+                {/* Lookbook Badge */}
+                <div className="flex items-center justify-between pb-4 border-b border-neutral-200">
+                  <div className="flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-black" />
+                    <span className="text-[11px] font-black tracking-widest uppercase text-neutral-500">
+                      EDITION: ARCHITECTURE 2026
+                    </span>
+                  </div>
+                  <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider">
+                    HOT DROP
+                  </span>
+                </div>
+
+                {/* Profile Specs */}
+                <div className="py-6 space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-neutral-400">ENGINEER PROFILE</span>
+                    <h3 className="text-2xl font-black uppercase text-black tracking-tight">{siteName}</h3>
+                    <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wider">{siteTagline}</p>
+                  </div>
+
+                  <div className="border-t border-b border-neutral-100 py-4 space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="font-bold text-neutral-500 uppercase">Location:</span>
+                      <span className="font-bold text-black">{settings?.location || 'Phnom Penh, Cambodia'}</span>
                     </div>
-                  ) : (
-                    <div style={{...s.projBanner, background: grad}}>
-                      <span style={s.projInitial}>{proj.title?.[0]?.toUpperCase()}</span>
-                      {proj.featured && <span style={s.featBadge}>★ Featured</span>}
+                    <div className="flex justify-between">
+                      <span className="font-bold text-neutral-500 uppercase">Contact Email:</span>
+                      <span className="font-bold text-black">{settings?.email || 'contact@laolimheang.space'}</span>
                     </div>
-                  )}
-                  
-                  <div style={s.projBody}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px',marginBottom:'6px'}}>
-                      <h3 style={s.projTitle}>{proj.title}</h3>
-                      {proj.category && <span style={s.projCat}>{proj.category}</span>}
+                    <div className="flex justify-between">
+                      <span className="font-bold text-neutral-500 uppercase">Telegram:</span>
+                      <span className="font-bold text-black">@{telegram.replace('@', '')}</span>
                     </div>
-                    <p style={s.projDesc}>{proj.description}</p>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'5px',marginTop:'8px'}}>
-                      {techs.slice(0,4).map(t => (
-                        <span key={t} style={{fontSize:'10px',padding:'2px 8px',borderRadius:'20px',background:`${tc(t)}15`,color:tc(t),border:`1px solid ${tc(t)}25`,fontWeight:'600'}}>{t}</span>
-                      ))}
-                    </div>
-                    <div style={{display:'flex',gap:'12px',marginTop:'12px'}}>
-                      {proj.liveUrl && <a href={proj.liveUrl} target="_blank" rel="noreferrer" style={s.projLink}>Compile & Run ↗</a>}
-                      {proj.githubUrl && <a href={proj.githubUrl} target="_blank" rel="noreferrer" style={{...s.projLink, color:'#475569'}}>View Source ↗</a>}
+                    <div className="flex justify-between">
+                      <span className="font-bold text-neutral-500 uppercase">Availability:</span>
+                      <span className="font-bold text-emerald-600 uppercase">Immediate / Open for Hire</span>
                     </div>
                   </div>
-                </TiltCard>
-              );
-            })}
-          </div>
-          <div style={{textAlign:'center',marginTop:'32px'}}>
-            <Link to="/portfolio" style={s.viewAllBtn} className="view-all-btn">Inspect All Nodes →</Link>
-          </div>
-        </section>
-      )}
 
-      {/* ── SERVICES ── */}
-      {services.length > 0 && (
-        <section style={{...s.section, background:'rgba(99,102,241,0.03)', borderTop:'1px solid rgba(99,102,241,0.06)', borderBottom:'1px solid rgba(99,102,241,0.06)', padding:'80px 24px'}}>
-          <div style={s.sectionHead}>
-            <span style={s.sectionLabel}>Operations</span>
-            <h2 style={s.sectionTitle}>Computational Services</h2>
-            <p style={s.sectionSub}>Optimized solutions for complex requirements</p>
-          </div>
-          <div style={s.serviceGrid}>
-            {services.map((svc, i) => (
-              <TiltCard key={svc.id} className="svc-card" style={s.svcCard}>
-                <div style={{...s.svcIcon, background: `${svcColors[i % svcColors.length]}18`, border:`1px solid ${svcColors[i % svcColors.length]}30`}}>
-                  <span style={{color: svcColors[i % svcColors.length], fontSize:'22px'}}>{svcEmoji[i % svcEmoji.length]}</span>
-                </div>
-                <h3 style={s.svcTitle}>{svc.title}</h3>
-                <p style={s.svcDesc}>{svc.description}</p>
-                <div style={{marginTop:'auto'}}>
-                  {(svc.features || []).slice(0,3).map((f,fi) => (
-                    <div key={fi} style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-                      <span style={{color:`${svcColors[i % svcColors.length]}`,fontSize:'12px'}}>O(1)</span>
-                      <span style={{color:'#64748b',fontSize:'12.5px'}}>{f}</span>
+                  <div className="space-y-2 pt-2">
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-neutral-400">VERIFIED DELIVERABLES</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="px-2.5 py-1 bg-neutral-100 text-black text-[11px] font-bold tracking-wider uppercase border border-neutral-300">
+                        Zero Downtime
+                      </span>
+                      <span className="px-2.5 py-1 bg-neutral-100 text-black text-[11px] font-bold tracking-wider uppercase border border-neutral-300">
+                        O(1) Data Structures
+                      </span>
+                      <span className="px-2.5 py-1 bg-neutral-100 text-black text-[11px] font-bold tracking-wider uppercase border border-neutral-300">
+                        Mobile Responsive
+                      </span>
+                      <span className="px-2.5 py-1 bg-black text-white text-[11px] font-bold tracking-wider uppercase">
+                        Clean Code
+                      </span>
                     </div>
-                  ))}
+                  </div>
                 </div>
-                <div style={{marginTop:'16px',paddingTop:'14px',borderTop:'1px solid rgba(99,102,241,0.08)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{color:'#34d399',fontWeight:'700',fontSize:'18px'}}>${Number(svc.price||0).toLocaleString()}<span style={{color:'#334155',fontSize:'11px',fontWeight:'400'}}>{svc.currency&&svc.currency!=='USD'?` ${svc.currency}`:''}</span></span>
-                  <Link to="/contact" style={{fontSize:'13px',fontWeight:'600',color:svcColors[i%svcColors.length],textDecoration:'none'}}>Execute →</Link>
-                </div>
-              </TiltCard>
-            ))}
-          </div>
-          <div style={{textAlign:'center',marginTop:'32px'}}>
-            <Link to="/services" style={s.viewAllBtn} className="view-all-btn">View All Operations →</Link>
-          </div>
-        </section>
-      )}
 
-      {/* ── CTA BANNER ── */}
-      <section style={s.ctaBanner}>
-        <div style={s.ctaOrb} />
-        <h2 style={s.ctaTitle}>Ready to Deploy?</h2>
-        <p style={s.ctaSub}>Let's compile your ideas into a scalable reality.</p>
-        <Link to="/contact" style={s.ctaBtn} className="hero-cta">
-          Initialize Project →
-        </Link>
+                {/* Card Bottom CTA */}
+                <Link
+                  to={ROUTES.PORTFOLIO}
+                  className="block text-center w-full py-3 bg-neutral-100 hover:bg-black hover:text-white text-black font-bold text-xs uppercase tracking-[0.2em] border border-black transition-colors duration-200"
+                >
+                  VIEW FULL ARCHITECTURE CATALOG &rarr;
+                </Link>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── SHOP BY CATEGORY / DISCIPLINES GRID (ZANDO STYLE) ── */}
+      <section className="py-14 border-b border-neutral-200 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-8 border-b-2 border-black pb-3">
+            <h2 className="text-xl sm:text-2xl font-black uppercase tracking-[0.15em] text-black">
+              EXPLORE BY DISCIPLINE
+            </h2>
+            {isAdmin && user && (
+              <Link to={ROUTES.ADMIN_SKILLS} className="text-xs font-bold text-black hover:underline flex items-center gap-1 uppercase tracking-wider">
+                <Edit3 className="w-3.5 h-3.5" /> Manage Skills
+              </Link>
+            )}
+          </div>
+
+          {loading ? (
+            /* Skeleton Loading for Disciplines */
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="border border-neutral-200 p-6 space-y-3 skeleton-shimmer h-40" />
+              ))}
+            </div>
+          ) : skills.length === 0 ? (
+            <div className="p-8 text-center border border-dashed border-neutral-300">
+              <p className="text-xs uppercase font-bold text-neutral-500">NO SKILL DISCIPLINES CONFIGURED YET</p>
+              {isAdmin && (
+                <Link to={ROUTES.ADMIN_SKILLS} className="mt-2 inline-block text-xs font-bold underline uppercase">
+                  Add Skills in Admin Panel &rarr;
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+              {skills.map((s, idx) => (
+                <div
+                  key={s.id || idx}
+                  className="group border border-neutral-200 bg-neutral-50 hover:border-black p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[11px] font-black tracking-widest text-neutral-400">0{idx + 1}</span>
+                      <span className="w-2 h-2 rounded-full bg-black group-hover:scale-125 transition-transform" />
+                    </div>
+                    <h3 className="text-sm sm:text-base font-black uppercase tracking-wider text-black group-hover:underline">
+                      {s.category}
+                    </h3>
+                    <p className="text-xs text-neutral-500 mt-2 font-medium">
+                      {(s.items || []).slice(0, 3).join(' • ')}
+                    </p>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-neutral-200 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-neutral-800">
+                    <span>{(s.items || []).length} TECHNOLOGIES</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── PROJECT CATALOG GRID (ZANDO PRODUCT CARD STYLE) ── */}
+      <section id="catalog" className="py-16 sm:py-20 border-b border-neutral-200 bg-[#fafafa]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Section Header with Category Tabs */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 pb-4 border-b-2 border-black">
+            <div>
+              <span className="text-xs font-black tracking-widest uppercase text-neutral-500 block mb-1">
+                FEATURED INVENTORY
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-black">
+                PROJECTS & ARCHITECTURE
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {isAdmin && user && (
+                <Link to={ROUTES.ADMIN_PROJECTS} className="text-xs font-bold text-black hover:underline flex items-center gap-1 uppercase tracking-wider mr-2">
+                  <Edit3 className="w-3.5 h-3.5" /> Manage Projects
+                </Link>
+              )}
+
+              {/* Zando Filter Tabs (Horizontal Pill Bar) */}
+              <div className="flex flex-wrap items-center gap-2">
+                {categories.map((cat) => {
+                  const isActive = activeFilter === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveFilter(cat)}
+                      className={`px-4 py-2 text-xs font-bold tracking-widest uppercase transition-colors duration-150 ${
+                        isActive
+                          ? 'bg-black text-white shadow-sm'
+                          : 'bg-white text-neutral-600 hover:text-black border border-neutral-300'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Skeleton Loading State for Projects */}
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} className="border border-neutral-200 bg-white p-6 space-y-4">
+                  <div className="aspect-[16/10] skeleton-shimmer rounded-sm" />
+                  <div className="h-5 skeleton-shimmer w-3/4 rounded-sm" />
+                  <div className="h-4 skeleton-shimmer w-1/2 rounded-sm" />
+                  <div className="h-16 skeleton-shimmer w-full rounded-sm" />
+                </div>
+              ))}
+            </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="p-16 text-center border-2 border-dashed border-neutral-300 space-y-3">
+              <p className="text-lg font-black uppercase text-black">NO PROJECTS AVAILABLE IN THIS CATEGORY</p>
+              <p className="text-xs text-neutral-500 uppercase tracking-wider">Add new projects via the admin dashboard to display them here.</p>
+              {isAdmin && (
+                <Link to={ROUTES.ADMIN_PROJECTS} className="inline-block px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider">
+                  + Add Project in Admin
+                </Link>
+              )}
+            </div>
+          ) : (
+            /* Product Grid: Zando Retail Layout */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {filteredProjects.map((project) => (
+                <div
+                  key={project.id}
+                  className="bg-white border border-neutral-200 hover:border-black flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+                >
+                  {/* Top Image / Visual Area (Zando Product Display) */}
+                  <div className="relative bg-neutral-100 aspect-[16/10] overflow-hidden border-b border-neutral-200 flex flex-col justify-between p-4">
+                    {/* Status / Category Badges */}
+                    <div className="flex items-center justify-between gap-2 z-10">
+                      <span className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-2 py-1">
+                        {project.category || 'SYSTEM'}
+                      </span>
+                      <span className="bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1">
+                        {project.status || 'VERIFIED'}
+                      </span>
+                    </div>
+
+                    {/* Geometric Monochromatic Accent Background */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-10 font-black text-7xl text-neutral-900 pointer-events-none select-none tracking-tighter">
+                      {(project.title || '').slice(0, 4).toUpperCase()}
+                    </div>
+
+                    {/* Architecture Metrics Overlay */}
+                    {project.metrics && project.metrics.length > 0 && (
+                      <div className="relative z-10 flex gap-2">
+                        {project.metrics.slice(0, 2).map((m, idx) => (
+                          <span key={idx} className="bg-white/95 text-black text-[10px] font-bold px-2 py-0.5 border border-neutral-300 shadow-sm">
+                            {m.label}: {m.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Details Section */}
+                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
+                        {siteName} STUDIO • VERIFIED
+                      </span>
+                      <h3 className="text-lg font-black uppercase tracking-tight text-black group-hover:underline">
+                        {project.title}
+                      </h3>
+                      {project.tagline && (
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                          {project.tagline}
+                        </p>
+                      )}
+                      <p className="text-xs text-neutral-600 leading-relaxed line-clamp-3 pt-1">
+                        {project.description}
+                      </p>
+                    </div>
+
+                    {/* Tech Stack Chips */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(project.technologies || []).slice(0, 4).map((tech) => (
+                          <span
+                            key={tech}
+                            className="px-2 py-0.5 bg-neutral-100 text-neutral-800 text-[10px] font-bold uppercase tracking-wider border border-neutral-200"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Action Bar (Zando Shop CTA Buttons) */}
+                      <div className="pt-3 border-t border-neutral-100 flex items-center gap-2">
+                        {project.liveUrl && (
+                          <a
+                            href={project.liveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 text-center py-2.5 bg-black text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-widest transition-colors duration-150 active:scale-95 flex items-center justify-center gap-1.5"
+                          >
+                            <span>LIVE PREVIEW</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                        {project.githubUrl ? (
+                          <a
+                            href={project.githubUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors duration-150 flex items-center gap-1"
+                          >
+                            <FaGithub className="w-3.5 h-3.5" />
+                            <span>CODE</span>
+                          </a>
+                        ) : (
+                          <Link
+                            to={ROUTES.PORTFOLIO}
+                            className="px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-wider border border-neutral-300 transition-colors duration-150"
+                          >
+                            SPECS
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Full Catalog Navigation Button */}
+          <div className="mt-12 text-center">
+            <Link
+              to={ROUTES.PORTFOLIO}
+              className="inline-flex items-center gap-2 px-10 py-4 bg-white text-black font-extrabold text-xs uppercase tracking-[0.25em] border-2 border-black hover:bg-black hover:text-white transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
+            >
+              <span>EXPLORE ALL ARCHITECTURES</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── SERVICES / SOLUTIONS (ZANDO RETAIL CARDS) ── */}
+      <section className="py-16 sm:py-20 border-b border-neutral-200 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
+            <span className="text-xs font-black tracking-widest uppercase text-neutral-500">
+              COMMERCIAL PACKAGES
+            </span>
+            <h2 className="text-3xl font-black uppercase tracking-tight text-black">
+              ENGINEERING SERVICES
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+              Turnkey software engineering deliverables for modern companies and venture-backed teams.
+            </p>
+          </div>
+
+          {loading ? (
+            /* Skeleton Loading for Services */
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="border-2 border-neutral-200 p-8 space-y-4 skeleton-shimmer h-96" />
+              ))}
+            </div>
+          ) : services.length === 0 ? (
+            <div className="p-12 text-center border border-dashed border-neutral-300">
+              <p className="text-xs uppercase font-bold text-neutral-500">NO SERVICES CURRENTLY CONFIGURED</p>
+              {isAdmin && (
+                <Link to={ROUTES.ADMIN_SERVICES} className="mt-2 inline-block text-xs font-bold underline uppercase">
+                  Add Services in Admin Panel &rarr;
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {services.slice(0, 3).map((svc, idx) => (
+                <div
+                  key={svc.id || idx}
+                  className="border-2 border-black p-8 bg-neutral-50 flex flex-col justify-between hover:bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-black">
+                        {idx === 0 ? <Code className="w-4 h-4" /> : idx === 1 ? <Server className="w-4 h-4" /> : <Cpu className="w-4 h-4" />}
+                        <span className="text-[11px] font-black uppercase tracking-widest text-neutral-500">
+                          {svc.category || 'PACKAGE'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider bg-black text-white">
+                        {svc.tag || 'AVAILABLE'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xl font-black uppercase tracking-tight text-black">
+                        {svc.title}
+                      </h3>
+                      {svc.price && (
+                        <p className="text-sm font-black text-black mt-1">
+                          ${Number(svc.price).toLocaleString()} / {svc.period || 'PROJECT'}
+                        </p>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-neutral-600 leading-relaxed pt-1">
+                      {svc.description}
+                    </p>
+
+                    {svc.features && svc.features.length > 0 && (
+                      <div className="pt-4 border-t border-neutral-200 space-y-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 block mb-2">
+                          INCLUDED DELIVERABLES:
+                        </span>
+                        {svc.features.map((item, dIdx) => (
+                          <div key={dIdx} className="flex items-center gap-2 text-xs font-semibold text-neutral-800">
+                            <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-8">
+                    <Link
+                      to={`${ROUTES.CONTACT}?service=${encodeURIComponent(svc.title)}`}
+                      className="block text-center w-full py-3.5 bg-black hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-[0.2em] transition-colors duration-150 active:scale-95"
+                    >
+                      INQUIRE PACKAGE &rarr;
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── PROMOTIONAL / CONTACT BANNER (ZANDO HIGH-CONTRAST) ── */}
+      <section className="bg-black text-white py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto text-center space-y-6 animate-fade-in">
+          <span className="inline-block px-3 py-1 bg-white text-black text-xs font-black tracking-[0.25em] uppercase">
+            COMMERCIAL AVAILABILITY
+          </span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-tight">
+            START YOUR SYSTEM BUILD TODAY
+          </h2>
+          <p className="text-neutral-400 text-xs sm:text-sm max-w-xl mx-auto font-medium leading-relaxed">
+            Need an enterprise web application, high-throughput backend APIs, or immediate full-stack development? Connect directly with {siteName}.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+            <Link
+              to={ROUTES.CONTACT}
+              className="px-8 py-4 bg-white text-black hover:bg-neutral-200 text-xs font-black tracking-[0.2em] uppercase transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
+            >
+              SCHEDULE SYSTEM INQUIRY
+            </Link>
+            <a
+              href={`https://t.me/${telegram.replace('@', '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-4 bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 text-xs font-black tracking-[0.2em] uppercase transition-all duration-200 hover:-translate-y-0.5 active:scale-95 flex items-center gap-2"
+            >
+              <FaTelegram className="w-4 h-4 text-sky-400" />
+              <span>TELEGRAM DIRECT</span>
+            </a>
+          </div>
+        </div>
       </section>
 
     </div>
   );
-};
-
-const gradients = [
-  'linear-gradient(135deg,#6366f1,#8b5cf6)',
-  'linear-gradient(135deg,#06b6d4,#3b82f6)',
-  'linear-gradient(135deg,#10b981,#059669)',
-];
-const svcColors = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ec4899'];
-const svcEmoji = ['⚡','⚙️','🕸️','☁️','🛡️','📊'];
-const floatPositions = [
-  { top:'-12px', left:'50px' },
-  { bottom:'-10px', right:'20px' },
-  { top:'50%', right:'-14px' },
-  { bottom:'30px', left:'-14px' },
-];
-
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-  .hero-cta:hover { box-shadow:0 12px 32px rgba(99,102,241,0.45) !important; }
-  .hero-ghost:hover { background:rgba(99,102,241,0.1) !important; color:#818cf8 !important; }
-  .proj-card:hover { border-color:rgba(99,102,241,0.4) !important; box-shadow:0 25px 60px rgba(0,0,0,0.5) !important; }
-  .svc-card { transition: all 0.3s ease !important; }
-  .svc-card:hover { border-color:rgba(99,102,241,0.4) !important; transform: translateY(-8px) !important; box-shadow: 0 20px 40px rgba(0,0,0,0.5) !important; }
-  .view-all-btn:hover { background:rgba(99,102,241,0.15) !important; color:#818cf8 !important; }
-`;
-
-const s = {
-  page: { background:'#05050A', minHeight:'100vh', fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif", color:'#e2e8f0', overflowX:'hidden' },
-
-  // Hero
-  hero: { position:'relative', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'40px', padding:'80px 4vw', maxWidth:'1600px', margin:'0 auto', flexWrap:'wrap', overflow:'hidden' },
-  orb: { position:'absolute', borderRadius:'50%', pointerEvents:'none', zIndex:0 },
-  heroContent: { flex:'1', minWidth:'320px', maxWidth:'580px', position:'relative', zIndex:2 },
-  heroBadge: { display:'inline-flex', alignItems:'center', gap:'8px', padding:'6px 14px', background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.25)', borderRadius:'20px', fontSize:'13px', fontWeight:'500', color:'#34d399', marginBottom:'24px', backdropFilter:'blur(5px)' },
-  heroBadgeDot: { width:'7px', height:'7px', borderRadius:'50%', background:'#34d399', boxShadow:'0 0 8px #34d399', animation:'blink 2s infinite' },
-  heroTitle: { fontSize:'clamp(36px,5vw,62px)', fontWeight:'900', lineHeight:'1.1', color:'#f1f5f9', margin:'0 0 20px', letterSpacing:'-0.03em' },
-  heroGradient: { background:'linear-gradient(135deg,#6366f1,#a78bfa,#06b6d4)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' },
-  heroSub: { color:'#94a3b8', fontSize:'17px', lineHeight:'1.65', margin:'0 0 32px', maxWidth:'480px' },
-  heroActions: { display:'flex', gap:'14px', flexWrap:'wrap', marginBottom:'48px' },
-  heroCta: { display:'inline-flex', alignItems:'center', gap:'8px', padding:'13px 26px', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius:'12px', color:'white', fontWeight:'700', fontSize:'15px', textDecoration:'none', boxShadow:'0 4px 20px rgba(99,102,241,0.4)', transition:'all 0.25s' },
-  heroGhost: { display:'inline-flex', alignItems:'center', gap:'8px', padding:'13px 26px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(99,102,241,0.25)', borderRadius:'12px', color:'#94a3b8', fontWeight:'600', fontSize:'15px', textDecoration:'none', transition:'all 0.25s', backdropFilter:'blur(10px)' },
-  heroStats: { display:'flex', gap:'32px', flexWrap:'wrap' },
-  statItem: { display:'flex', flexDirection:'column', gap:'2px' },
-  statVal: { fontSize:'26px', fontWeight:'800', color:'#f1f5f9', letterSpacing:'-0.02em', textShadow:'0 0 20px rgba(255,255,255,0.2)' },
-  statLbl: { fontSize:'12px', color:'#64748b', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.05em' },
-
-  // Code card
-  heroVisual: { flex:'1', minWidth:'300px', maxWidth:'480px', position:'relative', zIndex:2 },
-  codeCard: { background:'rgba(10,10,25,0.75)', border:'1px solid rgba(99,102,241,0.25)', borderRadius:'16px', overflow:'hidden', boxShadow:'0 30px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(16px)' },
-  cardHeader: { display:'flex', alignItems:'center', gap:'6px', padding:'12px 16px', background:'rgba(99,102,241,0.08)', borderBottom:'1px solid rgba(99,102,241,0.1)' },
-  dot: { width:'11px', height:'11px', borderRadius:'50%' },
-  cardFile: { color:'#64748b', fontSize:'12px', marginLeft:'8px', fontFamily:'monospace' },
-  code: { padding:'20px', fontFamily:"'Fira Code',monospace", fontSize:'13px', lineHeight:'1.7', color:'#94a3b8' },
-  kw: { color:'#c084fc' }, // purple
-  fn: { color:'#60a5fa' }, // blue
-  key: { color:'#34d399' }, // green
-  str: { color:'#fbbf24' }, // yellow
-  cursor: { color:'#818cf8', animation:'blink 1s infinite', marginLeft:'2px' },
-  floatBadge: { position:'absolute', padding:'5px 12px', background:'rgba(10,10,25,0.8)', border:'1px solid rgba(192,132,252,0.3)', borderRadius:'20px', backdropFilter:'blur(10px)', animation:'float 3s ease-in-out infinite', boxShadow:'0 10px 20px rgba(0,0,0,0.3)' },
-
-  // Sections
-  section: { padding:'100px 4vw', maxWidth:'1600px', margin:'0 auto', position:'relative', zIndex:2 },
-  sectionHead: { textAlign:'center', marginBottom:'50px' },
-  sectionLabel: { fontSize:'12px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.12em', color:'#8b5cf6', display:'block', marginBottom:'10px' },
-  sectionTitle: { fontSize:'clamp(28px,4vw,42px)', fontWeight:'800', color:'#f1f5f9', margin:'0 0 12px', letterSpacing:'-0.02em' },
-  sectionSub: { color:'#64748b', fontSize:'16px', margin:0 },
-
-  // Projects
-  projectGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:'24px' },
-  projCard: { background:'rgba(12,12,26,0.6)', border:'1px solid rgba(99,102,241,0.1)', borderRadius:'18px', overflow:'hidden', display:'flex', flexDirection:'column', backdropFilter:'blur(10px)' },
-  projBanner: { height:'140px', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' },
-  projInitial: { fontSize:'42px', fontWeight:'900', color:'rgba(255,255,255,0.9)', textShadow:'0 2px 10px rgba(0,0,0,0.3)', zIndex:1 },
-  featBadge: { position:'absolute', top:'10px', right:'10px', background:'rgba(0,0,0,0.5)', backdropFilter:'blur(8px)', color:'#fbbf24', fontSize:'10px', fontWeight:'700', padding:'3px 9px', borderRadius:'20px', border:'1px solid rgba(251,191,36,0.4)', zIndex:2 },
-  projBody: { padding:'18px', flex:1, display:'flex', flexDirection:'column', zIndex:1 },
-  projTitle: { color:'#f1f5f9', fontSize:'16px', fontWeight:'700', margin:0, letterSpacing:'-0.01em' },
-  projCat: { fontSize:'10px', fontWeight:'600', padding:'2px 9px', borderRadius:'20px', background:'rgba(99,102,241,0.12)', color:'#818cf8', border:'1px solid rgba(99,102,241,0.2)', whiteSpace:'nowrap', flexShrink:0 },
-  projDesc: { color:'#64748b', fontSize:'13px', lineHeight:'1.55', margin:'8px 0 0', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' },
-  projLink: { fontSize:'13px', fontWeight:'600', color:'#a78bfa', textDecoration:'none' },
-
-  // Services
-  serviceGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'20px' },
-  svcCard: { background:'rgba(10,10,24,0.6)', border:'1px solid rgba(99,102,241,0.1)', borderRadius:'18px', padding:'24px', display:'flex', flexDirection:'column', gap:'10px', backdropFilter:'blur(10px)' },
-  svcIcon: { width:'48px', height:'48px', borderRadius:'14px', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'4px', boxShadow:'0 4px 15px rgba(0,0,0,0.2)' },
-  svcTitle: { color:'#f1f5f9', fontSize:'17px', fontWeight:'700', margin:0 },
-  svcDesc: { color:'#64748b', fontSize:'13px', lineHeight:'1.55', margin:0 },
-
-  // View all
-  viewAllBtn: { display:'inline-flex', alignItems:'center', gap:'6px', padding:'10px 24px', background:'transparent', border:'1px solid rgba(99,102,241,0.2)', borderRadius:'10px', color:'#94a3b8', fontSize:'14px', fontWeight:'600', textDecoration:'none', transition:'all 0.2s' },
-
-  // CTA
-  ctaBanner: { position:'relative', textAlign:'center', padding:'100px 24px', overflow:'hidden', background:'linear-gradient(180deg,transparent,rgba(99,102,241,0.06),transparent)' },
-  ctaOrb: { position:'absolute', width:'600px', height:'600px', borderRadius:'50%', background:'radial-gradient(circle,rgba(139,92,246,0.15),transparent 70%)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none' },
-  ctaTitle: { fontSize:'clamp(28px,4vw,48px)', fontWeight:'900', color:'#f1f5f9', margin:'0 0 16px', letterSpacing:'-0.02em', position:'relative', zIndex:1 },
-  ctaSub: { color:'#94a3b8', fontSize:'17px', margin:'0 0 36px', position:'relative', zIndex:1 },
-  ctaBtn: { display:'inline-flex', alignItems:'center', gap:'8px', padding:'14px 32px', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius:'14px', color:'white', fontWeight:'700', fontSize:'16px', textDecoration:'none', boxShadow:'0 4px 20px rgba(99,102,241,0.4)', transition:'all 0.25s', position:'relative', zIndex:1 },
-
 };
 
 export default Home;
