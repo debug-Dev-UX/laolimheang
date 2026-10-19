@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
+import { subscribeToDocument, setDocument } from '../services/firebase/firestore';
 import { COLLECTIONS } from '../utils/constants';
 import { Base64UploadZone } from '../components/admin/Base64UploadZone';
 import ImageZoomModal from '../components/common/ImageZoomModal';
@@ -220,12 +221,7 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
 /* ─── Main Component ─── */
 const GalleryAdmin = () => {
   const { data: items, loading, add, update, remove } = useFirestore(COLLECTIONS.GALLERY);
-  const {
-    data: customCategoryDocs,
-    add: addCategoryDoc,
-    update: updateCategoryDoc,
-    remove: removeCategoryDoc,
-  } = useFirestore(COLLECTIONS.GALLERY_CATEGORIES);
+  const [categories, setCategories] = useState([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -244,24 +240,46 @@ const GalleryAdmin = () => {
     setTimeout(() => setToast(''), 3000);
   };
 
-  // ONLY categories created by the admin (no hardcoded demo categories)
-  const availableCategories = (customCategoryDocs || [])
-    .map((c) => c.name?.trim())
-    .filter(Boolean);
+  // Real-time synchronization of categories from Firebase Cloud (settings/gallery_categories)
+  useEffect(() => {
+    try {
+      localStorage.removeItem('firestore_cache_gallery_categories');
+    } catch (e) {}
+
+    const unsubscribe = subscribeToDocument(COLLECTIONS.SETTINGS, 'gallery_categories', (doc) => {
+      if (doc && Array.isArray(doc.list)) {
+        const parsed = doc.list.map((c, idx) =>
+          typeof c === 'string' ? { id: `cat-${idx}-${c.toLowerCase()}`, name: c } : c
+        );
+        setCategories(parsed);
+      } else {
+        setCategories([]);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
+  const availableCategories = categories.map((c) => c.name?.trim()).filter(Boolean);
 
   const handleAddCategory = async (name) => {
     const clean = name.trim();
     if (!clean) return;
+    const exists = categories.some((c) => c.name.toLowerCase() === clean.toLowerCase());
+    if (exists) {
+      showToast(`Category "${clean}" already exists.`);
+      return;
+    }
+    const newCat = { id: `cat-${Date.now()}`, name: clean };
+    const updated = [...categories, newCat];
     try {
-      const exists = (customCategoryDocs || []).some(
-        (c) => (c.name || '').toLowerCase() === clean.toLowerCase()
-      );
-      if (exists) {
-        showToast(`Category "${clean}" already exists.`);
-        return;
-      }
-      await addCategoryDoc({ name: clean, createdAt: new Date().toISOString() });
-      showToast(`Category "${clean}" created successfully.`);
+      await setDocument(COLLECTIONS.SETTINGS, 'gallery_categories', {
+        list: updated,
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(`Category "${clean}" created in cloud.`);
       setNewCategoryInput('');
     } catch (err) {
       showToast('Error creating category: ' + err.message);
@@ -279,8 +297,12 @@ const GalleryAdmin = () => {
       setEditingCatId(null);
       return;
     }
+    const updated = categories.map((c) => (c.id === catId ? { ...c, name: clean } : c));
     try {
-      await updateCategoryDoc(catId, { name: clean, updatedAt: new Date().toISOString() });
+      await setDocument(COLLECTIONS.SETTINGS, 'gallery_categories', {
+        list: updated,
+        updatedAt: new Date().toISOString(),
+      });
 
       // Synchronize any exhibits that were tagged with the old category name
       const affectedItems = (items || []).filter(
@@ -298,11 +320,15 @@ const GalleryAdmin = () => {
     }
   };
 
-  const handleDeleteCategory = async (catDocId, catName) => {
-    if (!window.confirm(`Delete category "${catName}"? This category will be removed from all device filters.`)) return;
+  const handleDeleteCategory = async (catId, catName) => {
+    if (!window.confirm(`Delete category "${catName}" across all devices?`)) return;
+    const updated = categories.filter((c) => c.id !== catId);
     try {
-      await removeCategoryDoc(catDocId);
-      showToast(`Category "${catName}" deleted.`);
+      await setDocument(COLLECTIONS.SETTINGS, 'gallery_categories', {
+        list: updated,
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(`Category "${catName}" deleted from cloud.`);
     } catch (err) {
       showToast('Error deleting category: ' + err.message);
     }
@@ -394,7 +420,7 @@ const GalleryAdmin = () => {
             <div>
               <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
                 <Tag className="w-4 h-4" />
-                <span>CATEGORY ARCHITECTURE (ADMIN CONTROLLED)</span>
+                <span>CATEGORY ARCHITECTURE (CLOUD SYNCED ACROSS DEVICES)</span>
               </h3>
               <p className="text-[11px] text-neutral-500 font-medium mt-0.5">
                 Create, edit, or delete categories here. They sync in real-time across all devices with zero demo data.
@@ -427,12 +453,12 @@ const GalleryAdmin = () => {
           </div>
 
           <div className="flex flex-wrap gap-2.5 pt-1">
-            {(!customCategoryDocs || customCategoryDocs.length === 0) ? (
+            {categories.length === 0 ? (
               <div className="p-4 border border-dashed border-neutral-300 text-center w-full text-neutral-400 text-xs font-medium uppercase tracking-wider">
                 NO CATEGORIES CREATED YET. ENTER A NAME ABOVE AND CLICK "CREATE" TO ADD YOUR FIRST CATEGORY.
               </div>
             ) : (
-              customCategoryDocs.map((cat) => {
+              categories.map((cat) => {
                 const isEditing = editingCatId === cat.id;
                 return (
                   <div

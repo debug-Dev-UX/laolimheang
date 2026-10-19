@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { subscribeToCollection } from '../services/firebase/firestore';
+import { subscribeToCollection, subscribeToDocument } from '../services/firebase/firestore';
 import { COLLECTIONS, ROUTES } from '../utils/constants';
 import { useAuth } from '../hooks/useAuth';
 import ImageZoomModal from '../components/common/ImageZoomModal';
@@ -27,9 +27,12 @@ const Gallery = () => {
       setLoading(false);
     });
 
-    const unsubscribeCategories = subscribeToCollection(COLLECTIONS.GALLERY_CATEGORIES, (catDocs) => {
-      if (catDocs && Array.isArray(catDocs)) {
-        setCustomCats(catDocs.map((c) => (c.name || '').toUpperCase()).filter(Boolean));
+    const unsubscribeCategories = subscribeToDocument(COLLECTIONS.SETTINGS, 'gallery_categories', (doc) => {
+      if (doc && Array.isArray(doc.list)) {
+        const names = doc.list.map((c) => (typeof c === 'string' ? c : c.name)).filter(Boolean);
+        setCustomCats(names.map((n) => n.toUpperCase()));
+      } else {
+        setCustomCats([]);
       }
     });
 
