@@ -30,6 +30,40 @@ import {
 
 const emptyForm = { title: '', category: '', description: '', imageUrl: '', images: [], featured: false, order: 0, size: 0 };
 
+// Universal timestamp extractor (Firestore Timestamp, ISO string, milliseconds, or ID)
+const getItemTimestamp = (item) => {
+  if (!item) return 0;
+  const val = item.createdAt || item.updatedAt;
+  if (val) {
+    if (typeof val === 'number') return val;
+    if (typeof val.toDate === 'function') {
+      try { return val.toDate().getTime(); } catch (e) {}
+    }
+    if (typeof val.seconds === 'number') {
+      return val.seconds * 1000 + Math.round((val.nanoseconds || 0) / 1000000);
+    }
+    if (typeof val === 'string') {
+      const parsed = new Date(val).getTime();
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    if (val instanceof Date) {
+      const t = val.getTime();
+      if (!isNaN(t)) return t;
+    }
+  }
+  if (typeof item.order === 'number' && item.order > 1577836800000) {
+    return item.order;
+  }
+  if (typeof item.id === 'string') {
+    const match = item.id.match(/\b(17\d{11,12})\b/);
+    if (match) {
+      const parsedId = Number(match[1]);
+      if (!isNaN(parsedId)) return parsedId;
+    }
+  }
+  return 0;
+};
+
 /* ─── Modal ─── */
 const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCategory }) => {
   const [form, setForm] = useState(emptyForm);
@@ -200,11 +234,15 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
     }
     setValidationError('');
     setSaving(true);
+    const nowIso = new Date().toISOString();
+    const nowEpoch = Date.now();
     await onSave({
       ...form,
       imageUrl: coverImage,
       images: finalImages,
-      order: Number(form.order) || 0,
+      createdAt: form.createdAt || nowIso,
+      updatedAt: nowIso,
+      order: Number(form.order) || nowEpoch,
       size: Number(form.size) || (coverImage ? Math.round(coverImage.length * 0.75) : 0),
     });
     setSaving(false);
@@ -641,11 +679,21 @@ const GalleryAdmin = () => {
 
   const handleSave = async (payload) => {
     try {
+      const nowIso = new Date().toISOString();
+      const nowEpoch = Date.now();
       if (editItem) {
-        await update(editItem.id, payload);
+        await update(editItem.id, {
+          ...payload,
+          updatedAt: nowIso,
+        });
         showToast('Gallery item updated.');
       } else {
-        await add(payload);
+        await add({
+          ...payload,
+          createdAt: payload.createdAt || nowIso,
+          updatedAt: nowIso,
+          order: Number(payload.order) || nowEpoch,
+        });
         showToast('Gallery item created.');
       }
       setModalOpen(false);
@@ -671,7 +719,7 @@ const GalleryAdmin = () => {
     return (i.category || '').toLowerCase() === filterCat.toLowerCase();
   });
 
-  // SORTING ALGORITHM: PINNED / FEATURED ITEMS ALWAYS STAY ON TOP!
+  // SORTING ALGORITHM: PINNED / FEATURED ITEMS ALWAYS STAY ON TOP, FOLLOWED BY AUTOMATIC LAST ADDED!
   const sorted = [...filtered].sort((a, b) => {
     // 1. PINNED ITEMS ALWAYS STAY ON TOP
     const aPinned = a.featured ? 1 : 0;
@@ -680,16 +728,18 @@ const GalleryAdmin = () => {
       return bPinned - aPinned; // pinned first!
     }
 
-    // 2. Secondary sort criteria
+    // 2. Secondary sort criteria (Default: automatic last added / newest!)
     if (sortBy === 'newest') {
-      const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
-      const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
-      return dateB - dateA;
+      const timeA = getItemTimestamp(a);
+      const timeB = getItemTimestamp(b);
+      if (timeA !== timeB) return timeB - timeA; // newest / last added first!
+      return (b.order || 0) - (a.order || 0);
     }
     if (sortBy === 'oldest') {
-      const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
-      const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
-      return dateA - dateB;
+      const timeA = getItemTimestamp(a);
+      const timeB = getItemTimestamp(b);
+      if (timeA !== timeB) return timeA - timeB; // oldest first!
+      return (a.order || 0) - (b.order || 0);
     }
     if (sortBy === 'size-desc') {
       const sizeA = Number(a.size || (a.imageUrl ? a.imageUrl.length : 0)) || 0;
@@ -898,8 +948,8 @@ const GalleryAdmin = () => {
             onChange={(e) => setSortBy(e.target.value)}
             className="bg-neutral-100 border border-neutral-300 text-black text-xs font-bold p-2 focus:outline-none focus:border-black uppercase tracking-wider cursor-pointer"
           >
-            <option value="newest">LATEST DATE (NEWEST)</option>
-            <option value="oldest">OLDEST DATE</option>
+            <option value="newest">LATEST ADDED (AUTOMATIC)</option>
+            <option value="oldest">EARLIEST ADDED (OLDEST)</option>
             <option value="size-desc">LARGEST FILE SIZE</option>
             <option value="size-asc">SMALLEST FILE SIZE</option>
           </select>
