@@ -4,7 +4,7 @@ import { subscribeToCollection, subscribeToDocument } from '../services/firebase
 import { COLLECTIONS, ROUTES } from '../utils/constants';
 import { useAuth } from '../hooks/useAuth';
 import ImageZoomModal from '../components/common/ImageZoomModal';
-import { Image, Eye, Plus, Sparkles, ZoomIn, ArrowUpDown, Pin } from 'lucide-react';
+import { Image, Eye, Plus, Sparkles, ZoomIn, ArrowUpDown, Pin, Layers } from 'lucide-react';
 
 const Gallery = () => {
   const { isAdmin, user } = useAuth();
@@ -256,6 +256,12 @@ const Gallery = () => {
                           <span>PINNED TO TOP</span>
                         </span>
                       )}
+                      {item.images && item.images.length > 1 && (
+                        <span className="bg-black text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 flex items-center gap-1 shadow-xs border border-white/20">
+                          <Layers className="w-2.5 h-2.5" />
+                          <span>{item.images.length} PHOTOS</span>
+                        </span>
+                      )}
                     </div>
                     {item.size && (
                       <div className="absolute bottom-2 right-2 z-10">
@@ -308,6 +314,7 @@ const Gallery = () => {
           isOpen={selectedIndex !== null}
           onClose={() => setSelectedIndex(null)}
           imageUrl={selectedItem.image || selectedItem.imageUrl || selectedItem.url}
+          images={selectedItem.images || []}
           title={selectedItem.title}
           category={selectedItem.category}
           description={selectedItem.description}

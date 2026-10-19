@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { subscribeToDocument, setDocument } from '../services/firebase/firestore';
 import { COLLECTIONS } from '../utils/constants';
-import { Base64UploadZone } from '../components/admin/Base64UploadZone';
+import { Base64UploadZone, processLargeImage } from '../components/admin/Base64UploadZone';
 import ImageZoomModal from '../components/common/ImageZoomModal';
+import { ImageCropModal } from '../components/common/ImageCropModal';
 import {
   Image,
   Plus,
@@ -21,9 +22,13 @@ import {
   Pin,
   Calendar,
   HardDrive,
+  Layers,
+  Crop,
+  UploadCloud,
+  Loader2,
 } from 'lucide-react';
 
-const emptyForm = { title: '', category: '', description: '', imageUrl: '', featured: false, order: 0, size: 0 };
+const emptyForm = { title: '', category: '', description: '', imageUrl: '', images: [], featured: false, order: 0, size: 0 };
 
 /* ─── Modal ─── */
 const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCategory }) => {
@@ -33,18 +38,33 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
   const [newCatName, setNewCatName] = useState('');
   const [validationError, setValidationError] = useState('');
 
+  // Album & Cropping state
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropTargetIndex, setCropTargetIndex] = useState(null);
+  const [cropImageUrl, setCropImageUrl] = useState('');
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [newUrlInput, setNewUrlInput] = useState('');
+
   useEffect(() => {
     if (open) {
       const defaultCategory = initial?.category || (availableCategories && availableCategories[0]) || '';
       const existingImg = initial?.imageUrl || initial?.image || initial?.url || '';
+      const existingImages = Array.isArray(initial?.images) && initial.images.length > 0
+        ? initial.images
+        : (existingImg ? [existingImg] : []);
+
       setForm(
         initial
-          ? { ...emptyForm, ...initial, imageUrl: existingImg }
-          : { ...emptyForm, category: defaultCategory }
+          ? { ...emptyForm, ...initial, imageUrl: existingImg, images: existingImages }
+          : { ...emptyForm, category: defaultCategory, images: [] }
       );
       setShowNewCatInput(availableCategories.length === 0);
       setNewCatName('');
       setValidationError('');
+      setCropModalOpen(false);
+      setCropTargetIndex(null);
+      setCropImageUrl('');
+      setNewUrlInput('');
     }
   }, [open, initial, availableCategories]);
 
@@ -67,18 +87,125 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
     setShowNewCatInput(false);
   };
 
+  // Batch upload multiple photos into the album
+  const handleBatchUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setBatchUploading(true);
+    setValidationError('');
+
+    try {
+      const converted = [];
+      for (const file of files) {
+        const dataUrl = await processLargeImage(file);
+        if (dataUrl) converted.push(dataUrl);
+      }
+
+      setForm((p) => {
+        const combined = [...(p.images || []), ...converted];
+        return {
+          ...p,
+          images: combined,
+          imageUrl: p.imageUrl || combined[0] || '',
+        };
+      });
+    } catch (err) {
+      setValidationError('Failed to process photos: ' + err.message);
+    } finally {
+      setBatchUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  // Add individual URL to album
+  const handleAddUrl = (e) => {
+    e.preventDefault();
+    const clean = newUrlInput.trim();
+    if (!clean) return;
+    setForm((p) => {
+      const combined = [...(p.images || []), clean];
+      return {
+        ...p,
+        images: combined,
+        imageUrl: p.imageUrl || combined[0] || '',
+      };
+    });
+    setNewUrlInput('');
+  };
+
+  // Set an image as the album cover
+  const handleSetCover = (url) => {
+    setForm((p) => ({ ...p, imageUrl: url }));
+  };
+
+  // Open cropper on a specific photo
+  const handleOpenCrop = (url, index = null) => {
+    setCropImageUrl(url);
+    setCropTargetIndex(index);
+    setCropModalOpen(true);
+  };
+
+  // Apply crop result
+  const handleCropDone = (croppedUrl) => {
+    if (cropTargetIndex !== null && cropTargetIndex >= 0) {
+      setForm((p) => {
+        const updated = [...(p.images || [])];
+        const wasCover = p.imageUrl === updated[cropTargetIndex] || cropTargetIndex === 0;
+        updated[cropTargetIndex] = croppedUrl;
+        return {
+          ...p,
+          images: updated,
+          imageUrl: wasCover ? croppedUrl : p.imageUrl,
+        };
+      });
+    } else {
+      setForm((p) => {
+        const currentList = p.images || [];
+        const isAlreadyIn = currentList.includes(p.imageUrl);
+        return {
+          ...p,
+          imageUrl: croppedUrl,
+          images: isAlreadyIn
+            ? currentList.map((img) => (img === p.imageUrl ? croppedUrl : img))
+            : [croppedUrl, ...currentList],
+        };
+      });
+    }
+    setCropModalOpen(false);
+  };
+
+  // Remove photo from album
+  const handleRemovePhoto = (idx) => {
+    setForm((p) => {
+      const updated = (p.images || []).filter((_, i) => i !== idx);
+      const isRemovingCover = p.imageUrl === (p.images || [])[idx];
+      return {
+        ...p,
+        images: updated,
+        imageUrl: isRemovingCover ? (updated[0] || '') : p.imageUrl,
+      };
+    });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.imageUrl) {
-      setValidationError('Please select or upload an image before saving.');
+    const finalImages = form.images && form.images.length > 0
+      ? form.images
+      : (form.imageUrl ? [form.imageUrl] : []);
+    const coverImage = form.imageUrl || finalImages[0] || '';
+
+    if (!coverImage && finalImages.length === 0) {
+      setValidationError('Please select or upload at least one image before saving.');
       return;
     }
     setValidationError('');
     setSaving(true);
     await onSave({
       ...form,
+      imageUrl: coverImage,
+      images: finalImages,
       order: Number(form.order) || 0,
-      size: Number(form.size) || (form.imageUrl ? Math.round(form.imageUrl.length * 0.75) : 0),
+      size: Number(form.size) || (coverImage ? Math.round(coverImage.length * 0.75) : 0),
     });
     setSaving(false);
     onClose();
@@ -87,14 +214,20 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 animate-fade-in">
       <div className="fixed inset-0 bg-black/80 backdrop-blur-xs" onClick={onClose} />
-      <div className="relative bg-white border-2 border-black max-w-2xl w-full p-5 sm:p-8 z-10 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-slide-up">
+      <div className="relative bg-white border-2 border-black max-w-3xl w-full p-5 sm:p-8 z-10 max-h-[95vh] sm:max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl animate-slide-up">
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
           <div>
             <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
               LOOKBOOK REPOSITORY
             </span>
-            <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black">
-              {initial ? 'EDIT GALLERY EXHIBIT' : 'ADD NEW GALLERY ITEM'}
+            <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black flex items-center gap-2">
+              <span>{initial ? 'EDIT GALLERY EXHIBIT' : 'ADD NEW GALLERY ITEM'}</span>
+              {form.images?.length > 1 && (
+                <span className="bg-amber-400 text-black text-[10px] font-black uppercase px-2 py-0.5 tracking-wider">
+                  ALBUM ({form.images.length} PHOTOS)
+                </span>
+              )}
             </h2>
           </div>
           <button onClick={onClose} className="p-2 text-black hover:text-neutral-500 cursor-pointer" aria-label="Close modal">
@@ -108,7 +241,7 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
           </div>
         )}
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="block text-xs font-black uppercase tracking-wider text-black">
@@ -173,29 +306,150 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="block text-xs font-black uppercase tracking-wider text-black">
-              GALLERY IMAGE *
-            </label>
-            <Base64UploadZone
-              currentUrl={form.imageUrl}
-              onUploaded={(url, size) => {
-                setForm((p) => ({
-                  ...p,
-                  imageUrl: url,
-                  size: size || p.size || 0,
-                }));
-                setValidationError('');
-              }}
-            />
-            <input
-              name="imageUrl"
-              value={form.imageUrl}
-              onChange={handle}
-              required
-              placeholder="Or paste direct image URL..."
-              className="w-full bg-neutral-100 border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-3 focus:outline-none focus:border-black mt-2"
-            />
+          {/* ── Multi-Image Album Section ── */}
+          <div className="space-y-3 p-4 bg-neutral-50 border border-neutral-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200 pb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-black" />
+                <span className="text-xs font-black uppercase tracking-wider text-black">
+                  ALBUM PHOTOS ({form.images?.length || 0} IMAGES)
+                </span>
+              </div>
+
+              {/* Upload Multiple Photos Button */}
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider cursor-pointer shadow-xs active:scale-95 transition-all">
+                {batchUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>PROCESSING...</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>+ ADD PHOTOS TO ALBUM</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleBatchUpload}
+                  disabled={batchUploading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* Primary Cover Upload Zone */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
+                PRIMARY EXHIBIT COVER PHOTO
+              </span>
+              <Base64UploadZone
+                currentUrl={form.imageUrl}
+                onUploaded={(url, size) => {
+                  setForm((p) => {
+                    const currentList = p.images || [];
+                    const combined = currentList.includes(url) ? currentList : [url, ...currentList];
+                    return {
+                      ...p,
+                      imageUrl: url,
+                      images: combined,
+                      size: size || p.size || 0,
+                    };
+                  });
+                  setValidationError('');
+                }}
+              />
+            </div>
+
+            {/* Add photo by direct URL input */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={newUrlInput}
+                onChange={(e) => setNewUrlInput(e.target.value)}
+                placeholder="Or paste image URL to append into album..."
+                className="flex-1 bg-white border border-neutral-300 text-black placeholder-neutral-400 text-xs font-medium p-2.5 focus:outline-none focus:border-black"
+              />
+              <button
+                type="button"
+                onClick={handleAddUrl}
+                disabled={!newUrlInput.trim()}
+                className="px-4 py-2.5 bg-neutral-200 hover:bg-neutral-300 text-black text-xs font-bold uppercase tracking-wider disabled:opacity-50 cursor-pointer"
+              >
+                + ADD URL
+              </button>
+            </div>
+
+            {/* Album Images Grid with Cover selector, Cropper & Delete */}
+            {form.images && form.images.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500 block">
+                  MANAGE ALBUM PHOTOS (CLICK TO CROP / RE-CENTER OR SET AS COVER):
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-1">
+                  {form.images.map((imgUrl, idx) => {
+                    const isCover = (form.imageUrl && form.imageUrl === imgUrl) || (!form.imageUrl && idx === 0);
+                    return (
+                      <div
+                        key={idx}
+                        className={`relative group bg-white border-2 p-1.5 flex flex-col justify-between ${
+                          isCover ? 'border-black ring-2 ring-amber-400' : 'border-neutral-200'
+                        }`}
+                      >
+                        <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
+                          <img
+                            src={imgUrl}
+                            alt={`Album ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {isCover && (
+                            <span className="absolute top-1 left-1 bg-amber-400 text-black text-[8px] font-black uppercase px-1.5 py-0.5 tracking-wider shadow-xs">
+                              COVER
+                            </span>
+                          )}
+                          <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[8px] font-mono px-1">
+                            #{idx + 1}
+                          </span>
+                        </div>
+
+                        {/* Action buttons under thumbnail */}
+                        <div className="mt-1.5 flex items-center justify-between gap-1">
+                          {!isCover && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetCover(imgUrl)}
+                              className="text-[9px] font-black uppercase text-neutral-600 hover:text-black hover:underline cursor-pointer"
+                              title="Set as album cover"
+                            >
+                              SET COVER
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCrop(imgUrl, idx)}
+                            className="text-[9px] font-black uppercase bg-neutral-100 hover:bg-neutral-200 text-black px-1.5 py-0.5 flex items-center gap-0.5 cursor-pointer"
+                            title="Crop and center this photo"
+                          >
+                            <Crop className="w-2.5 h-2.5" />
+                            <span>CROP</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(idx)}
+                            className="text-neutral-400 hover:text-rose-600 p-0.5 cursor-pointer ml-auto"
+                            title="Remove photo from album"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -250,6 +504,20 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
           </div>
         </form>
       </div>
+
+      {/* Individual Photo Cropping Modal */}
+      {cropModalOpen && cropImageUrl && (
+        <ImageCropModal
+          isOpen={cropModalOpen}
+          imageUrl={cropImageUrl}
+          onClose={() => {
+            setCropModalOpen(false);
+            setCropTargetIndex(null);
+            setCropImageUrl('');
+          }}
+          onCropComplete={handleCropDone}
+        />
+      )}
     </div>
   );
 };
@@ -695,6 +963,12 @@ const GalleryAdmin = () => {
                         <span>PINNED TO TOP</span>
                       </span>
                     )}
+                    {item.images && item.images.length > 1 && (
+                      <span className="bg-black text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 flex items-center gap-1 shadow-xs border border-white/20">
+                        <Layers className="w-2.5 h-2.5" />
+                        <span>{item.images.length} PHOTOS</span>
+                      </span>
+                    )}
                   </div>
                   {item.size && (
                     <div className="absolute bottom-2 right-2 z-10">
@@ -764,6 +1038,7 @@ const GalleryAdmin = () => {
           isOpen={!!zoomItem}
           onClose={() => setZoomItem(null)}
           imageUrl={zoomItem.imageUrl || zoomItem.image || zoomItem.url}
+          images={zoomItem.images || []}
           title={zoomItem.title}
           category={zoomItem.category}
           description={zoomItem.description}

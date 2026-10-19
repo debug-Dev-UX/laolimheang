@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Crop,
   Check,
@@ -9,6 +10,7 @@ import {
   Maximize2,
   Move,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 
 const ASPECT_RATIOS = [
@@ -32,42 +34,84 @@ export const ImageCropModal = ({
   const [aspectName, setAspectName] = useState(initialAspect);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [imgNatural, setImgNatural] = useState({ width: 0, height: 0 });
   const [cropping, setCropping] = useState(false);
+  const [frameDimensions, setFrameDimensions] = useState({ width: 480, height: 360 });
 
   const containerRef = useRef(null);
   const frameRef = useRef(null);
   const imageRef = useRef(null);
 
-  // Reset state on new image
+  // Recalculate frame dimensions based on aspect ratio and container size
+  const updateFrameDimensions = useCallback(() => {
+    if (!containerRef.current) return;
+    const container = containerRef.current.getBoundingClientRect();
+    const maxW = container.width * 0.92;
+    const maxH = container.height * 0.92;
+
+    let w = maxW;
+    let h = w / aspect;
+    if (h > maxH) {
+      h = maxH;
+      w = h * aspect;
+    }
+    setFrameDimensions({ width: Math.round(w), height: Math.round(h) });
+  }, [aspect]);
+
   useEffect(() => {
-    if (isOpen && imageUrl) {
-      setScale(1);
+    if (isOpen) {
+      updateFrameDimensions();
+      window.addEventListener('resize', updateFrameDimensions);
+      return () => window.removeEventListener('resize', updateFrameDimensions);
+    }
+  }, [isOpen, updateFrameDimensions]);
+
+  // Load natural dimensions & initialize image to COVER frame
+  useEffect(() => {
+    if (!isOpen || !imageUrl) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const nw = img.naturalWidth || img.width || 800;
+      const nh = img.naturalHeight || img.height || 600;
+      setImgNatural({ width: nw, height: nh });
+
+      // Reset transform
       setPosition({ x: 0, y: 0 });
       setRotation(0);
-      setAspect(4 / 3);
-      setAspectName('4:3');
-
-      const img = new Image();
-      img.onload = () => {
-        setImageDimensions({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
-      };
-      img.src = imageUrl;
-    }
+      setScale(1);
+    };
+    img.src = imageUrl;
   }, [isOpen, imageUrl]);
 
-  // Center alignment helper
+  // Handle center reset
   const handleCenter = () => {
     setPosition({ x: 0, y: 0 });
     setScale(1);
   };
 
-  // Rotate helper
+  // Rotate helper (90 degrees clockwise)
   const handleRotate = () => {
     setRotation((prev) => (prev + 90) % 360);
   };
 
-  // Mouse & Touch Drag Handlers
+  // Base rendered dimensions of image scaled to "cover" the crop frame at scale=1
+  const isRotated90or270 = rotation % 180 !== 0;
+  const effectiveImgWidth = isRotated90or270 ? imgNatural.height : imgNatural.width;
+  const effectiveImgHeight = isRotated90or270 ? imgNatural.width : imgNatural.height;
+
+  // Cover scale: ensures the image fills the entire frame width & height with NO empty black borders
+  const coverRatio = effectiveImgWidth && effectiveImgHeight && frameDimensions.width && frameDimensions.height
+    ? Math.max(
+        frameDimensions.width / effectiveImgWidth,
+        frameDimensions.height / effectiveImgHeight
+      )
+    : 1;
+
+  const baseWidth = Math.round((imgNatural.width || 400) * coverRatio);
+  const baseHeight = Math.round((imgNatural.height || 300) * coverRatio);
+
+  // Drag handlers (mouse & mobile touch)
   const handleStartDrag = (clientX, clientY) => {
     setIsDragging(true);
     setDragStart({
@@ -111,84 +155,72 @@ export const ImageCropModal = ({
     }
   };
 
-  // Wheel zoom in crop box
+  // Wheel zoom
   const onWheel = (e) => {
     e.preventDefault();
-    const delta = e.deltaY < 0 ? 0.1 : -0.1;
-    setScale((prev) => Math.min(Math.max(prev + delta, 0.6), 3.5));
+    const delta = e.deltaY < 0 ? 0.08 : -0.08;
+    setScale((prev) => Math.min(Math.max(Number((prev + delta).toFixed(2)), 0.8), 3.5));
   };
 
-  // Generate cropped output canvas
+  // Apply crop and output clean canvas
   const handleApplyCrop = async () => {
-    if (!imageRef.current || !frameRef.current) return;
+    if (!imageUrl || !imgNatural.width || !imgNatural.height) return;
     setCropping(true);
 
     try {
-      const frameRect = frameRef.current.getBoundingClientRect();
-      const imgRect = imageRef.current.getBoundingClientRect();
-
-      // Output canvas dimensions
-      const targetWidth = Math.round(Math.min(imageDimensions.width, 1600));
+      // High-resolution output canvas
+      const targetWidth = Math.min(Math.max(imgNatural.width, 1200), 1600);
       const targetHeight = Math.round(targetWidth / aspect);
 
       const canvas = document.createElement('canvas');
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       const ctx = canvas.getContext('2d');
+
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Background fill in case of margins
+      // Clean white base fill
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-      // Calculation of source coordinates based on frame vs image geometry
-      const scaleX = (imageDimensions.width || 1) / imgRect.width;
-      const scaleY = (imageDimensions.height || 1) / imgRect.height;
+      // Scale multiplier from on-screen frame to output canvas
+      const frameScaleFactor = targetWidth / frameDimensions.width;
 
-      const cropX = (frameRect.left - imgRect.left) * scaleX;
-      const cropY = (frameRect.top - imgRect.top) * scaleY;
-      const cropW = frameRect.width * scaleX;
-      const cropH = frameRect.height * scaleY;
+      // Mathematical matrix transform: exact WYSIWYG matching what user positioned in the frame
+      ctx.save();
+      // Center canvas origin
+      ctx.translate(targetWidth / 2, targetHeight / 2);
+      // Apply user panning offset scaled to canvas
+      ctx.translate(position.x * frameScaleFactor, position.y * frameScaleFactor);
+      // Apply user rotation
+      ctx.rotate((rotation * Math.PI) / 180);
+      // Apply user scale
+      ctx.scale(scale, scale);
 
-      // Draw transformed image
+      // Load clean source image
       const sourceImg = new Image();
       sourceImg.crossOrigin = 'anonymous';
 
-      await new Promise((res, rej) => {
-        sourceImg.onload = res;
-        sourceImg.onerror = rej;
+      await new Promise((resolve, reject) => {
+        sourceImg.onload = resolve;
+        sourceImg.onerror = reject;
         sourceImg.src = imageUrl;
       });
 
-      if (rotation !== 0) {
-        // Handle rotation if applied
-        ctx.save();
-        ctx.translate(targetWidth / 2, targetHeight / 2);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.drawImage(
-          sourceImg,
-          cropX,
-          cropY,
-          cropW,
-          cropH,
-          -targetWidth / 2,
-          -targetHeight / 2,
-          targetWidth,
-          targetHeight
-        );
-        ctx.restore();
-      } else {
-        ctx.drawImage(sourceImg, cropX, cropY, cropW, cropH, 0, 0, targetWidth, targetHeight);
-      }
+      // Draw image centered at origin with base cover dimensions
+      const drawW = baseWidth * frameScaleFactor;
+      const drawH = baseHeight * frameScaleFactor;
+      ctx.drawImage(sourceImg, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.restore();
 
-      // Encode WebP with safe fallback
+      // Export format: WebP with JPEG fallback
       let dataUrl = canvas.toDataURL('image/webp', 0.85);
       if (!dataUrl || !dataUrl.startsWith('data:image/webp')) {
         dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       }
 
-      // Guarantee under Firestore 750KB limit
+      // Safeguard against Firestore 1MB document limit
       if (dataUrl.length > 700 * 1024) {
         dataUrl = canvas.toDataURL('image/jpeg', 0.72);
       }
@@ -205,9 +237,9 @@ export const ImageCropModal = ({
 
   if (!isOpen || !imageUrl) return null;
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in select-none"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in select-none"
       onMouseMove={onMouseMove}
       onMouseUp={handleEndDrag}
       onTouchMove={onTouchMove}
@@ -239,7 +271,7 @@ export const ImageCropModal = ({
           </button>
         </div>
 
-        {/* Aspect Ratio Selector Pills */}
+        {/* Aspect Ratio Selector Pills & Transform Tools */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
             <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mr-1">
@@ -255,7 +287,7 @@ export const ImageCropModal = ({
                 }}
                 className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                   aspectName === item.name
-                    ? 'bg-black text-white'
+                    ? 'bg-black text-white shadow-xs'
                     : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
                 }`}
               >
@@ -268,16 +300,16 @@ export const ImageCropModal = ({
             <button
               type="button"
               onClick={handleRotate}
-              className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-black border border-neutral-300 text-xs font-bold uppercase flex items-center gap-1 cursor-pointer"
+              className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-black border border-neutral-300 text-xs font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
               title="Rotate 90 degrees"
             >
               <RotateCw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">ROTATE</span>
+              <span className="hidden sm:inline">ROTATE 90°</span>
             </button>
             <button
               type="button"
               onClick={handleCenter}
-              className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-black border border-neutral-300 text-xs font-bold uppercase flex items-center gap-1 cursor-pointer"
+              className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-black border border-neutral-300 text-xs font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
               title="Reset center"
             >
               <Move className="w-3.5 h-3.5" />
@@ -292,100 +324,104 @@ export const ImageCropModal = ({
           onWheel={onWheel}
           className="relative w-full h-[52vh] sm:h-[58vh] bg-neutral-950 flex items-center justify-center overflow-hidden border border-neutral-800"
         >
-          {/* Draggable & Scalable Image */}
-          <div
-            onMouseDown={onMouseDown}
-            onTouchStart={onTouchStart}
-            style={{
-              transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-              cursor: isDragging ? 'grabbing' : 'grab',
-              transition: isDragging ? 'none' : 'transform 0.05s ease-out',
-            }}
-            className="absolute will-change-transform select-none"
-          >
-            <img
-              ref={imageRef}
-              src={imageUrl}
-              alt="Crop target"
-              draggable={false}
-              className="max-w-none max-h-[50vh] object-contain pointer-events-none"
-            />
-          </div>
-
-          {/* Semi-transparent Dark Overlay Backdrop */}
-          <div className="absolute inset-0 bg-black/60 pointer-events-none" />
-
-          {/* Clear Viewport Frame with grid guides */}
+          {/* Framed Crop Area */}
           <div
             ref={frameRef}
             style={{
-              aspectRatio: `${aspect}`,
-              maxHeight: '88%',
-              maxWidth: '88%',
+              width: `${frameDimensions.width}px`,
+              height: `${frameDimensions.height}px`,
             }}
-            className="relative border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] pointer-events-none z-10 flex flex-col justify-between"
+            className="relative overflow-hidden border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] z-10 flex flex-col justify-between"
           >
+            {/* The Image inside the frame */}
+            <div
+              onMouseDown={onMouseDown}
+              onTouchStart={onTouchStart}
+              style={{
+                width: `${baseWidth}px`,
+                height: `${baseHeight}px`,
+                transform: `translate(calc(-50% + ${frameDimensions.width / 2 + position.x}px), calc(-50% + ${frameDimensions.height / 2 + position.y}px)) rotate(${rotation}deg) scale(${scale})`,
+                cursor: isDragging ? 'grabbing' : 'grab',
+                transformOrigin: 'center center',
+              }}
+              className="absolute top-0 left-0 will-change-transform select-none"
+            >
+              <img
+                ref={imageRef}
+                src={imageUrl}
+                alt="Crop target"
+                draggable={false}
+                className="w-full h-full object-cover pointer-events-none"
+              />
+            </div>
+
             {/* Grid 3x3 Composition Guidelines */}
-            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-40">
+            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-40 z-20">
               <div className="border-r border-b border-white/60" />
               <div className="border-r border-b border-white/60" />
               <div className="border-b border-white/60" />
               <div className="border-r border-b border-white/60" />
               <div className="border-r border-b border-white/60" />
               <div className="border-b border-white/60" />
-              <div className="border-r border-white/60" />
-              <div className="border-r border-white/60" />
+              <div className="border-r border-b border-white/60" />
+              <div className="border-r border-b border-white/60" />
               <div />
             </div>
 
             {/* Corner Markers */}
-            <div className="w-3 h-3 border-t-2 border-l-2 border-white -mt-0.5 -ml-0.5" />
-            <div className="w-3 h-3 border-t-2 border-r-2 border-white -mt-0.5 -mr-0.5 absolute top-0 right-0" />
-            <div className="w-3 h-3 border-b-2 border-l-2 border-white -mb-0.5 -ml-0.5 absolute bottom-0 left-0" />
-            <div className="w-3 h-3 border-b-2 border-r-2 border-white -mb-0.5 -mr-0.5 absolute bottom-0 right-0" />
+            <div className="w-3.5 h-3.5 border-t-2 border-l-2 border-white -mt-0.5 -ml-0.5 z-20" />
+            <div className="w-3.5 h-3.5 border-t-2 border-r-2 border-white -mt-0.5 -mr-0.5 absolute top-0 right-0 z-20" />
+            <div className="w-3.5 h-3.5 border-b-2 border-l-2 border-white -mb-0.5 -ml-0.5 absolute bottom-0 left-0 z-20" />
+            <div className="w-3.5 h-3.5 border-b-2 border-r-2 border-white -mb-0.5 -mr-0.5 absolute bottom-0 right-0 z-20" />
 
-            <div className="absolute top-2 left-2 bg-black/80 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5">
-              DRAG &amp; ZOOM TO CENTER SUBJECT
+            {/* Subtle instructional pill */}
+            <div className="absolute top-2 left-2 bg-black/85 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 z-20 border border-white/20">
+              DRAG TO CENTER SUBJECT
             </div>
           </div>
         </div>
 
-        {/* Bottom Zoom Slider & Action Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-neutral-200">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 shrink-0">
+        {/* Bottom Control Bar */}
+        <div className="flex items-center justify-between gap-4 pt-2 border-t border-neutral-200 flex-wrap">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-black uppercase tracking-wider text-black">
               ZOOM: {Math.round(scale * 100)}%
             </span>
-            <button
-              type="button"
-              onClick={() => setScale((p) => Math.max(p - 0.15, 0.6))}
-              className="p-1 text-neutral-500 hover:text-black cursor-pointer"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <input
-              type="range"
-              min="0.6"
-              max="3"
-              step="0.05"
-              value={scale}
-              onChange={(e) => setScale(parseFloat(e.target.value))}
-              className="w-32 sm:w-48 accent-black cursor-pointer"
-            />
-            <button
-              type="button"
-              onClick={() => setScale((p) => Math.min(p + 0.15, 3))}
-              className="p-1 text-neutral-500 hover:text-black cursor-pointer"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setScale((s) => Math.max(Number((s - 0.1).toFixed(2)), 0.8))}
+                className="p-1 text-neutral-500 hover:text-black cursor-pointer"
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <input
+                type="range"
+                min="0.8"
+                max="3"
+                step="0.05"
+                value={scale}
+                onChange={(e) => setScale(parseFloat(e.target.value))}
+                className="w-28 sm:w-44 accent-black cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => setScale((s) => Math.min(Number((s + 0.1).toFixed(2)), 3))}
+                className="p-1 text-neutral-500 hover:text-black cursor-pointer"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 shrink-0">
+          <div className="flex items-center gap-2 ml-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 border border-neutral-300 text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors cursor-pointer"
+              disabled={cropping}
+              className="px-4 py-2 border border-neutral-300 text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors cursor-pointer disabled:opacity-50"
             >
               CANCEL
             </button>
@@ -393,16 +429,29 @@ export const ImageCropModal = ({
               type="button"
               onClick={handleApplyCrop}
               disabled={cropping}
-              className="px-6 py-2.5 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+              className="px-5 py-2 bg-black text-white text-xs font-black uppercase tracking-widest hover:bg-neutral-800 transition-all active:scale-95 flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
             >
-              <Check className="w-4 h-4" />
-              <span>{cropping ? 'CROPPING...' : 'APPLY CROP'}</span>
+              {cropping ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>SAVING...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>APPLY CROP</span>
+                </>
+              )}
             </button>
           </div>
         </div>
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 };
 
 export default ImageCropModal;

@@ -13,6 +13,113 @@ import {
   Crop,
 } from 'lucide-react';
 
+// High-performance client-side multi-pass optimizer (Mobile + Desktop verified)
+export const processLargeImage = (file, onProgressUpdate) => {
+  return new Promise((resolve, reject) => {
+    onProgressUpdate?.(15, file.size * 0.15);
+
+    const img = new Image();
+    let objectUrl = null;
+
+    const cleanup = () => {
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch (e) {}
+      }
+    };
+
+    img.onload = () => {
+      try {
+        onProgressUpdate?.(60, file.size * 0.6);
+        const canvas = document.createElement('canvas');
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        // Crisp 2K high-definition balance (up to 2048px)
+        const MAX_DIM = 2048;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        onProgressUpdate?.(80, file.size * 0.8);
+
+        // Pass 1: WebP at 0.82 quality with JPEG fallback for older mobile engines
+        let dataUrl = canvas.toDataURL('image/webp', 0.82);
+        if (!dataUrl || !dataUrl.startsWith('data:image/webp')) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        }
+
+        // Pass 2: If size exceeds 700KB, adjust quality so it is 100% cloud-safe for Firestore
+        if (dataUrl.length > 700 * 1024) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+        }
+        // Pass 3: If still > 700KB, scale dimension to 1440px
+        if (dataUrl.length > 700 * 1024) {
+          const scale = 1440 / Math.max(canvas.width, canvas.height);
+          canvas.width = Math.round(canvas.width * scale);
+          canvas.height = Math.round(canvas.height * scale);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          dataUrl = canvas.toDataURL('image/jpeg', 0.70);
+        }
+
+        cleanup();
+        onProgressUpdate?.(100, file.size);
+        resolve(dataUrl);
+      } catch (canvasErr) {
+        cleanup();
+        reject(canvasErr);
+      }
+    };
+
+    img.onerror = () => {
+      cleanup();
+      // Fallback to FileReader if objectURL has codec issues on certain devices
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.min(fallbackImg.width, 1920);
+          canvas.height = Math.min(fallbackImg.height, 1920);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(fallbackImg, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        fallbackImg.onerror = () => reject(new Error('Failed to decode image data on this device.'));
+        fallbackImg.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('Failed to read media file.'));
+      reader.readAsDataURL(file);
+    };
+
+    // Native hardware-accelerated memory-efficient loading
+    if (typeof window.URL !== 'undefined' && typeof window.URL.createObjectURL === 'function') {
+      objectUrl = URL.createObjectURL(file);
+      img.src = objectUrl;
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+};
+
 export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', maxSizeMB = 150 }) => {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -26,113 +133,6 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
   const inputRef = useRef(null);
 
   const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
-
-  // High-performance client-side multi-pass optimizer (Mobile + Desktop verified)
-  const processLargeImage = (file, onProgressUpdate) => {
-    return new Promise((resolve, reject) => {
-      onProgressUpdate?.(15, file.size * 0.15);
-
-      const img = new Image();
-      let objectUrl = null;
-
-      const cleanup = () => {
-        if (objectUrl) {
-          try {
-            URL.revokeObjectURL(objectUrl);
-          } catch (e) {}
-        }
-      };
-
-      img.onload = () => {
-        try {
-          onProgressUpdate?.(60, file.size * 0.6);
-          const canvas = document.createElement('canvas');
-          let width = img.naturalWidth || img.width;
-          let height = img.naturalHeight || img.height;
-
-          // Crisp 2K high-definition balance (up to 2048px)
-          const MAX_DIM = 2048;
-          if (width > MAX_DIM || height > MAX_DIM) {
-            if (width > height) {
-              height = Math.round((height * MAX_DIM) / width);
-              width = MAX_DIM;
-            } else {
-              width = Math.round((width * MAX_DIM) / height);
-              height = MAX_DIM;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
-
-          onProgressUpdate?.(80, file.size * 0.8);
-
-          // Pass 1: WebP at 0.82 quality with JPEG fallback for older mobile engines
-          let dataUrl = canvas.toDataURL('image/webp', 0.82);
-          if (!dataUrl || !dataUrl.startsWith('data:image/webp')) {
-            dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-          }
-
-          // Pass 2: If size exceeds 700KB, adjust quality so it is 100% cloud-safe for Firestore
-          if (dataUrl.length > 700 * 1024) {
-            dataUrl = canvas.toDataURL('image/jpeg', 0.72);
-          }
-          // Pass 3: If still > 700KB, scale dimension to 1440px
-          if (dataUrl.length > 700 * 1024) {
-            const scale = 1440 / Math.max(canvas.width, canvas.height);
-            canvas.width = Math.round(canvas.width * scale);
-            canvas.height = Math.round(canvas.height * scale);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            dataUrl = canvas.toDataURL('image/jpeg', 0.70);
-          }
-
-          cleanup();
-          onProgressUpdate?.(100, file.size);
-          resolve(dataUrl);
-        } catch (canvasErr) {
-          cleanup();
-          reject(canvasErr);
-        }
-      };
-
-      img.onerror = () => {
-        cleanup();
-        // Fallback to FileReader if objectURL has codec issues on certain devices
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const fallbackImg = new Image();
-          fallbackImg.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.min(fallbackImg.width, 1920);
-            canvas.height = Math.min(fallbackImg.height, 1920);
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(fallbackImg, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.8));
-          };
-          fallbackImg.onerror = () => reject(new Error('Failed to decode image data on this device.'));
-          fallbackImg.src = e.target.result;
-        };
-        reader.onerror = () => reject(new Error('Failed to read media file.'));
-        reader.readAsDataURL(file);
-      };
-
-      // Native hardware-accelerated memory-efficient loading
-      if (typeof window.URL !== 'undefined' && typeof window.URL.createObjectURL === 'function') {
-        objectUrl = URL.createObjectURL(file);
-        img.src = objectUrl;
-      } else {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  };
 
   const handleFile = useCallback(
     async (file) => {
