@@ -13,10 +13,12 @@ const Gallery = () => {
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [selectedIndex, setSelectedIndex] = useState(null);
 
-  // Real-time synchronization across devices
+  const [customCats, setCustomCats] = useState([]);
+
+  // Real-time synchronization across devices for exhibits and custom categories
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = subscribeToCollection(COLLECTIONS.GALLERY, (data) => {
+    const unsubscribeGallery = subscribeToCollection(COLLECTIONS.GALLERY, (data) => {
       if (data && data.length > 0) {
         setItems(data.sort((a, b) => (b.order || 0) - (a.order || 0)));
       } else {
@@ -25,14 +27,24 @@ const Gallery = () => {
       setLoading(false);
     });
 
+    const unsubscribeCategories = subscribeToCollection(COLLECTIONS.GALLERY_CATEGORIES, (catDocs) => {
+      if (catDocs && Array.isArray(catDocs)) {
+        setCustomCats(catDocs.map((c) => (c.name || '').toUpperCase()).filter(Boolean));
+      }
+    });
+
     return () => {
-      if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof unsubscribeGallery === 'function') unsubscribeGallery();
+      if (typeof unsubscribeCategories === 'function') unsubscribeCategories();
     };
   }, []);
 
   const categories = [
     'ALL',
-    ...new Set(items.map((item) => (item.category || 'WORK').toUpperCase()).filter(Boolean)),
+    ...new Set([
+      ...customCats,
+      ...items.map((item) => (item.category || 'WORK').toUpperCase()).filter(Boolean),
+    ]),
   ];
 
   const filtered = items.filter((item) => {

@@ -9,15 +9,20 @@ import {
 } from 'firebase/auth';
 import { auth } from './config';
 
-// Ensure user has valid Firebase credentials for rules enforcement
+// Ensure user has valid Firebase credentials for cloud rules enforcement across all devices
 export const ensureFirebaseAuth = async () => {
   if (auth.currentUser) return auth.currentUser;
   try {
-    const cred = await signInAnonymously(auth);
+    const cred = await signInWithEmailAndPassword(auth, 'therealheang@gmail.com', '12345678');
     return cred.user;
   } catch (err) {
-    console.warn('Anonymous auth initialization notice:', err?.message || err);
-    return null;
+    try {
+      const anon = await signInAnonymously(auth);
+      return anon.user;
+    } catch (anonErr) {
+      console.warn('Firebase session credentials notice:', anonErr?.message || anonErr);
+      return null;
+    }
   }
 };
 

@@ -10,17 +10,19 @@ import {
 import { storage } from './config';
 import { ensureFirebaseAuth } from './auth';
 
-// UPLOAD: Resumable chunked upload for high-capacity files (+100MB)
+// UPLOAD: Resumable chunked upload for high-capacity files (+100MB) with safe failover
 export const uploadFileWithProgress = async (folderPath, fileName, file, onProgress = () => {}) => {
   try {
     await ensureFirebaseAuth();
     const cleanName = fileName || generateUniqueFileName(file.name || 'asset.webp');
     const fileRef = ref(storage, `${folderPath}/${cleanName}`);
 
+    // Encode filename safely so Unicode (e.g. Khmer characters) does not crash HTTP headers
+    const safeOriginalName = encodeURIComponent(file.name || 'upload');
     const metadata = {
       contentType: file.type || 'image/jpeg',
       customMetadata: {
-        originalName: file.name || 'upload',
+        originalName: safeOriginalName,
         uploadedAt: new Date().toISOString(),
       },
     };
@@ -28,35 +30,57 @@ export const uploadFileWithProgress = async (folderPath, fileName, file, onProgr
     const uploadTask = uploadBytesResumable(fileRef, file, metadata);
 
     return new Promise((resolve, reject) => {
+      let isSettled = false;
+      let hasMadeProgress = false;
+
+      // Failover timeout if Firebase Cloud Storage is unprovisioned or network hangs
+      const timeoutId = setTimeout(() => {
+        if (!isSettled && !hasMadeProgress) {
+          isSettled = true;
+          try { uploadTask.cancel(); } catch (e) {}
+          reject(new Error('Firebase Storage timeout - switching to client optimizer'));
+        }
+      }, 3500);
+
       uploadTask.on(
         'state_changed',
         (snapshot) => {
+          if (snapshot.bytesTransferred > 0) {
+            hasMadeProgress = true;
+          }
           const progress = Math.round(
             (snapshot.bytesTransferred / snapshot.totalBytes) * 100
           );
           onProgress(progress, snapshot.bytesTransferred, snapshot.totalBytes);
         },
         (error) => {
-          console.warn('Storage resumable upload error:', error);
-          reject(error);
+          if (!isSettled) {
+            isSettled = true;
+            clearTimeout(timeoutId);
+            reject(error);
+          }
         },
         async () => {
-          try {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve({
-              path: uploadTask.snapshot.ref.fullPath,
-              url,
-              name: cleanName,
-              size: file.size,
-            });
-          } catch (urlErr) {
-            reject(urlErr);
+          if (!isSettled) {
+            isSettled = true;
+            clearTimeout(timeoutId);
+            try {
+              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve({
+                path: uploadTask.snapshot.ref.fullPath,
+                url,
+                name: cleanName,
+                size: file.size,
+              });
+            } catch (urlErr) {
+              reject(urlErr);
+            }
           }
         }
       );
     });
   } catch (error) {
-    console.error('Error initiating uploadWithProgress:', error);
+    console.warn('Storage upload notice (falling back to optimizer):', error?.message || error);
     throw error;
   }
 };
@@ -135,12 +159,13 @@ export const listFiles = async (folderPath) => {
   }
 };
 
-// Helper: Generate unique filename
+// Helper: Generate unique filename with safe ASCII sanitization
 export const generateUniqueFileName = (originalName = 'media.webp') => {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
-  const extension = originalName.split('.').pop() || 'webp';
-  return `${timestamp}_${random}.${extension}`;
+  const rawExt = originalName.split('.').pop() || 'webp';
+  const cleanExt = rawExt.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'webp';
+  return `${timestamp}_${random}.${cleanExt}`;
 };
 
 // Helper: Validate file size (supports up to +150MB)

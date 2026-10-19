@@ -46,6 +46,7 @@ export const COLLECTIONS = {
   SKILLS: 'skills',
   ADS: 'ads',
   GALLERY: 'gallery',
+  GALLERY_CATEGORIES: 'gallery_categories',
   PROJECT_IMAGES: 'project_images',
 };
 

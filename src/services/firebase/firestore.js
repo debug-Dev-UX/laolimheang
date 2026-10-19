@@ -203,14 +203,8 @@ export const subscribeToCollection = (collectionName, callback, constraints = []
       q,
       snapshot => {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (docs.length > 0) {
-          setLocalCache(collectionName, docs);
-          callback(docs);
-        } else {
-          // If Firestore collection has 0 items, check if local items exist
-          const cached = getLocalCache(collectionName);
-          callback(cached);
-        }
+        setLocalCache(collectionName, docs);
+        callback(docs);
       },
       error => {
         console.warn(`Firestore real-time subscription notice [${collectionName}]:`, error?.message || error);
