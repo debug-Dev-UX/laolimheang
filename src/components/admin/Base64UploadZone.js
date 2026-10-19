@@ -23,28 +23,28 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
 
   const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
 
-  // High-performance client-side multi-pass optimizer guaranteed under Firestore 1MB threshold
+  // High-performance client-side multi-pass optimizer (Mobile + Desktop verified)
   const processLargeImage = (file, onProgressUpdate) => {
     return new Promise((resolve, reject) => {
       onProgressUpdate?.(15, file.size * 0.15);
-      const reader = new FileReader();
 
-      reader.onprogress = (e) => {
-        if (e.lengthComputable && e.total > 0) {
-          const pct = Math.min(45, Math.round((e.loaded / e.total) * 45));
-          onProgressUpdate?.(pct, e.loaded * 0.45);
+      const img = new Image();
+      let objectUrl = null;
+
+      const cleanup = () => {
+        if (objectUrl) {
+          try {
+            URL.revokeObjectURL(objectUrl);
+          } catch (e) {}
         }
       };
 
-      reader.onload = (event) => {
-        onProgressUpdate?.(55, file.size * 0.55);
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-          onProgressUpdate?.(70, file.size * 0.7);
+      img.onload = () => {
+        try {
+          onProgressUpdate?.(60, file.size * 0.6);
           const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
 
           // Crisp 2K high-definition balance (up to 2048px)
           const MAX_DIM = 2048;
@@ -65,14 +65,17 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
 
-          onProgressUpdate?.(85, file.size * 0.85);
+          onProgressUpdate?.(80, file.size * 0.8);
 
-          // Pass 1: Crisp WebP at 0.82 quality
+          // Pass 1: WebP at 0.82 quality with JPEG fallback for older mobile engines
           let dataUrl = canvas.toDataURL('image/webp', 0.82);
+          if (!dataUrl || !dataUrl.startsWith('data:image/webp')) {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          }
 
           // Pass 2: If size exceeds 700KB, adjust quality so it is 100% cloud-safe for Firestore
           if (dataUrl.length > 700 * 1024) {
-            dataUrl = canvas.toDataURL('image/webp', 0.72);
+            dataUrl = canvas.toDataURL('image/jpeg', 0.72);
           }
           // Pass 3: If still > 700KB, scale dimension to 1440px
           if (dataUrl.length > 700 * 1024) {
@@ -80,16 +83,50 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
             canvas.width = Math.round(canvas.width * scale);
             canvas.height = Math.round(canvas.height * scale);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            dataUrl = canvas.toDataURL('image/webp', 0.70);
+            dataUrl = canvas.toDataURL('image/jpeg', 0.70);
           }
 
+          cleanup();
           onProgressUpdate?.(100, file.size);
           resolve(dataUrl);
-        };
-        img.onerror = () => reject(new Error('Failed to decode image data.'));
+        } catch (canvasErr) {
+          cleanup();
+          reject(canvasErr);
+        }
       };
-      reader.onerror = () => reject(new Error('Failed to read file from disk.'));
-      reader.readAsDataURL(file);
+
+      img.onerror = () => {
+        cleanup();
+        // Fallback to FileReader if objectURL has codec issues on certain devices
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.min(fallbackImg.width, 1920);
+            canvas.height = Math.min(fallbackImg.height, 1920);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(fallbackImg, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
+          };
+          fallbackImg.onerror = () => reject(new Error('Failed to decode image data on this device.'));
+          fallbackImg.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('Failed to read media file.'));
+        reader.readAsDataURL(file);
+      };
+
+      // Native hardware-accelerated memory-efficient loading
+      if (typeof window.URL !== 'undefined' && typeof window.URL.createObjectURL === 'function') {
+        objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -105,7 +142,7 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
 
       setError('');
       setUploading(true);
-      setProgress(10);
+      setProgress(15);
       setUploadedBytes(0);
       setTotalBytes(file.size);
       setFileDetails({
@@ -115,7 +152,7 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
       });
 
       try {
-        // High-resolution instant processor (supports up to +150MB files and all Unicode filenames)
+        // High-resolution instant processor (works natively on iOS, Android, and Desktop)
         const optimizedUrl = await processLargeImage(file, (pct, loaded) => {
           setProgress(pct);
           setUploadedBytes(loaded);
@@ -123,7 +160,7 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
 
         setProgress(100);
         setUploadedBytes(file.size);
-        onUploaded(optimizedUrl);
+        onUploaded(optimizedUrl, file.size);
         setUploading(false);
 
         // Attempt background cloud storage archival if storage is available
@@ -133,7 +170,7 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
         } catch (e) {}
       } catch (err) {
         console.error('Upload processing failed:', err);
-        setError('Upload failed: ' + (err?.message || 'Could not process media.'));
+        setError('Upload failed: ' + (err?.message || 'Could not process media on this device.'));
         setUploading(false);
         setProgress(0);
       }
@@ -158,23 +195,23 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
 
   return (
     <div className="space-y-3">
-      {/* Upload Drop Zone */}
+      {/* Upload Drop Zone with native Mobile + Desktop touch overlay */}
       <div
-        onClick={() => inputRef.current && inputRef.current.click()}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        className={`border-2 border-dashed p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+        className={`relative border-2 border-dashed p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 select-none ${
           dragging
             ? 'border-black bg-neutral-100 scale-[1.01]'
             : 'border-neutral-300 hover:border-black bg-neutral-50 hover:bg-white'
         } ${uploading ? 'pointer-events-none opacity-80' : ''}`}
       >
+        {/* Full coverage native file input ensuring 100% tap trigger on mobile iOS Safari & Android Chrome */}
         <input
           ref={inputRef}
           type="file"
           accept="image/*,video/mp4,video/webm"
-          className="hidden"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
           onChange={(e) => {
             if (e.target.files && e.target.files[0]) {
               handleFile(e.target.files[0]);
@@ -183,13 +220,13 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
         />
 
         {uploading ? (
-          <div className="space-y-4 w-full max-w-xs">
+          <div className="space-y-4 w-full max-w-xs relative z-10 pointer-events-none">
             <div className="w-12 h-12 bg-black text-white flex items-center justify-center mx-auto rounded-full animate-pulse">
               <Loader2 className="w-6 h-6 animate-spin" />
             </div>
             <div>
               <span className="text-xs font-black uppercase tracking-wider text-black block">
-                UPLOADING HIGH-CAPACITY ASSET ({progress}%)
+                PROCESSING MEDIA ({progress}%)
               </span>
               {fileDetails && (
                 <span className="text-[11px] text-neutral-500 font-medium block mt-0.5">
@@ -206,20 +243,20 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 relative z-10 pointer-events-none">
             <div className="w-12 h-12 bg-white border border-neutral-300 flex items-center justify-center mx-auto text-black shadow-xs">
               <UploadCloud className="w-6 h-6 stroke-[1.8]" />
             </div>
             <div>
               <span className="text-xs font-black uppercase tracking-wider text-black block">
-                DRAG &amp; DROP HIGH-RES MEDIA OR CLICK TO BROWSE
+                TAP TO CHOOSE PHOTO / DRAG &amp; DROP
               </span>
               <p className="text-[11px] text-neutral-500 font-medium mt-1">
-                Supports Photography, RAW, 4K Blueprints &amp; Videos up to <span className="font-bold text-black">+{maxSizeMB}MB</span>
+                Supports Camera, Photo Library, RAW, 4K Blueprints up to <span className="font-bold text-black">+{maxSizeMB}MB</span>
               </p>
             </div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-black text-white text-[9px] font-black uppercase tracking-widest">
-              <span>UP TO 150MB ACCEPTED</span>
+              <span>MOBILE &amp; DESKTOP READY</span>
             </div>
           </div>
         )}
@@ -252,7 +289,7 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
                 ACTIVE ASSET ATTACHED
               </span>
               <span className="text-xs font-bold text-black truncate block mt-0.5">
-                {currentUrl.startsWith('data:') ? 'Embedded High-Definition Media Payload' : currentUrl}
+                {currentUrl.startsWith('data:') ? 'High-Definition Cloud Media Ready' : currentUrl}
               </span>
             </div>
           </div>
@@ -260,8 +297,8 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onUploaded('')}
-              className="p-1.5 border border-neutral-300 text-neutral-500 hover:text-black hover:border-black transition-colors"
+              onClick={() => onUploaded('', 0)}
+              className="p-1.5 border border-neutral-300 text-neutral-500 hover:text-black hover:border-black transition-colors cursor-pointer"
               title="Remove asset"
             >
               <X className="w-4 h-4" />

@@ -4,13 +4,14 @@ import { subscribeToCollection, subscribeToDocument } from '../services/firebase
 import { COLLECTIONS, ROUTES } from '../utils/constants';
 import { useAuth } from '../hooks/useAuth';
 import ImageZoomModal from '../components/common/ImageZoomModal';
-import { Image, Eye, Plus, Sparkles, ZoomIn } from 'lucide-react';
+import { Image, Eye, Plus, Sparkles, ZoomIn, ArrowUpDown, Pin } from 'lucide-react';
 
 const Gallery = () => {
   const { isAdmin, user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest' | 'size-desc' | 'size-asc'
   const [selectedIndex, setSelectedIndex] = useState(null);
 
   const [customCats, setCustomCats] = useState([]);
@@ -56,7 +57,40 @@ const Gallery = () => {
     return (item.category || '').toUpperCase() === activeFilter;
   });
 
-  const selectedItem = selectedIndex !== null ? filtered[selectedIndex] : null;
+  // SORTING ALGORITHM: PINNED / FEATURED ITEMS ALWAYS STAY ON TOP!
+  const sorted = [...filtered].sort((a, b) => {
+    // 1. PINNED / FEATURED ALWAYS AT THE TOP!
+    const aPinned = a.featured ? 1 : 0;
+    const bPinned = b.featured ? 1 : 0;
+    if (aPinned !== bPinned) {
+      return bPinned - aPinned; // pinned first!
+    }
+
+    // 2. Secondary sort criteria
+    if (sortBy === 'newest') {
+      const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return dateB - dateA;
+    }
+    if (sortBy === 'oldest') {
+      const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return dateA - dateB;
+    }
+    if (sortBy === 'size-desc') {
+      const sizeA = Number(a.size || (a.imageUrl ? a.imageUrl.length : 0)) || 0;
+      const sizeB = Number(b.size || (b.imageUrl ? b.imageUrl.length : 0)) || 0;
+      return sizeB - sizeA;
+    }
+    if (sortBy === 'size-asc') {
+      const sizeA = Number(a.size || (a.imageUrl ? a.imageUrl.length : 0)) || 0;
+      const sizeB = Number(b.size || (b.imageUrl ? b.imageUrl.length : 0)) || 0;
+      return sizeA - sizeB;
+    }
+    return (b.order || 0) - (a.order || 0);
+  });
+
+  const selectedItem = selectedIndex !== null ? sorted[selectedIndex] : null;
 
   const handlePrev = () => {
     if (selectedIndex !== null && selectedIndex > 0) {
@@ -65,9 +99,17 @@ const Gallery = () => {
   };
 
   const handleNext = () => {
-    if (selectedIndex !== null && selectedIndex < filtered.length - 1) {
+    if (selectedIndex !== null && selectedIndex < sorted.length - 1) {
       setSelectedIndex(selectedIndex + 1);
     }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return null;
+    const num = Number(bytes);
+    if (num > 1024 * 1024) return (num / (1024 * 1024)).toFixed(1) + ' MB';
+    if (num > 1024) return Math.round(num / 1024) + ' KB';
+    return num + ' B';
   };
 
   return (
@@ -108,25 +150,46 @@ const Gallery = () => {
         </div>
       </div>
 
-      {/* ── Category Filter Tabs ── */}
+      {/* ── Category Filter Tabs & Sort Controls ── */}
       <div className="border-b border-neutral-200 bg-white py-4 sticky top-16 sm:top-20 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => {
-                setActiveFilter(cat);
-                setSelectedIndex(null);
-              }}
-              className={`px-4 py-2 text-xs font-bold tracking-widest uppercase whitespace-nowrap transition-all duration-200 active:scale-95 ${
-                activeFilter === cat
-                  ? 'bg-black text-white shadow-xs'
-                  : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
-              }`}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Categories Bar */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-1">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setActiveFilter(cat);
+                  setSelectedIndex(null);
+                }}
+                className={`px-4 py-2 text-xs font-bold tracking-widest uppercase whitespace-nowrap transition-all duration-200 active:scale-95 cursor-pointer ${
+                  activeFilter === cat
+                    ? 'bg-black text-white shadow-xs'
+                    : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort Controls */}
+          <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 md:border-l border-neutral-200 pt-3 md:pt-0 md:pl-4">
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 flex items-center gap-1">
+              <ArrowUpDown className="w-3.5 h-3.5" />
+              <span>SORT:</span>
+            </span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-neutral-100 border border-neutral-300 text-black text-xs font-bold p-2 focus:outline-none focus:border-black uppercase tracking-wider cursor-pointer"
             >
-              {cat}
-            </button>
-          ))}
+              <option value="newest">LATEST DATE (NEWEST)</option>
+              <option value="oldest">OLDEST DATE</option>
+              <option value="size-desc">LARGEST FILE SIZE</option>
+              <option value="size-asc">SMALLEST FILE SIZE</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -144,7 +207,7 @@ const Gallery = () => {
               </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : sorted.length === 0 ? (
           /* Empty State */
           <div className="border-2 border-dashed border-neutral-300 p-16 text-center space-y-4 animate-fade-in">
             <Image className="w-12 h-12 text-neutral-400 mx-auto stroke-[1.5]" />
@@ -167,11 +230,13 @@ const Gallery = () => {
         ) : (
           /* Gallery Grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filtered.map((item, idx) => (
+            {sorted.map((item, idx) => (
               <div
                 key={item.id}
                 onClick={() => setSelectedIndex(idx)}
-                className="border border-neutral-200 hover:border-black p-4 bg-white cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group flex flex-col justify-between"
+                className={`border bg-white cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group flex flex-col justify-between p-4 ${
+                  item.featured ? 'border-2 border-black' : 'border-neutral-200 hover:border-black'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden border border-neutral-200">
@@ -181,9 +246,24 @@ const Gallery = () => {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                       loading="lazy"
                     />
-                    <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 shadow-xs">
-                      {item.category || 'EXHIBIT'}
+                    <div className="absolute top-2 left-2 flex flex-wrap gap-1.5 z-10">
+                      <span className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 shadow-xs">
+                        {item.category || 'EXHIBIT'}
+                      </span>
+                      {item.featured && (
+                        <span className="bg-amber-400 text-black text-[9px] font-black uppercase tracking-widest px-2 py-0.5 flex items-center gap-1 shadow-xs">
+                          <Pin className="w-2.5 h-2.5 fill-black" />
+                          <span>PINNED TO TOP</span>
+                        </span>
+                      )}
                     </div>
+                    {item.size && (
+                      <div className="absolute bottom-2 right-2 z-10">
+                        <span className="bg-black/80 backdrop-blur-xs text-white text-[9px] font-mono px-2 py-0.5">
+                          {formatFileSize(item.size)}
+                        </span>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <span className="bg-black text-white text-xs font-bold uppercase tracking-widest px-3.5 py-2 flex items-center gap-1.5 shadow-md">
                         <ZoomIn className="w-4 h-4" />
@@ -225,7 +305,7 @@ const Gallery = () => {
       {/* ── High-Resolution Interactive Zoom Lightbox Modal ── */}
       {selectedItem && (
         <ImageZoomModal
-          isOpen={!!selectedItem}
+          isOpen={selectedIndex !== null}
           onClose={() => setSelectedIndex(null)}
           imageUrl={selectedItem.image || selectedItem.imageUrl || selectedItem.url}
           title={selectedItem.title}
@@ -234,7 +314,7 @@ const Gallery = () => {
           onPrev={handlePrev}
           onNext={handleNext}
           hasPrev={selectedIndex > 0}
-          hasNext={selectedIndex < filtered.length - 1}
+          hasNext={selectedIndex < sorted.length - 1}
         />
       )}
     </div>

@@ -17,11 +17,13 @@ import {
   Eye,
   ZoomIn,
   Tag,
-  FolderPlus,
-  SlidersHorizontal,
+  ArrowUpDown,
+  Pin,
+  Calendar,
+  HardDrive,
 } from 'lucide-react';
 
-const emptyForm = { title: '', category: '', description: '', imageUrl: '', featured: false, order: 0 };
+const emptyForm = { title: '', category: '', description: '', imageUrl: '', featured: false, order: 0, size: 0 };
 
 /* ─── Modal ─── */
 const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCategory }) => {
@@ -29,13 +31,20 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
   const [saving, setSaving] = useState(false);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [validationError, setValidationError] = useState('');
 
   useEffect(() => {
     if (open) {
       const defaultCategory = initial?.category || (availableCategories && availableCategories[0]) || '';
-      setForm(initial ? { ...emptyForm, ...initial } : { ...emptyForm, category: defaultCategory });
+      const existingImg = initial?.imageUrl || initial?.image || initial?.url || '';
+      setForm(
+        initial
+          ? { ...emptyForm, ...initial, imageUrl: existingImg }
+          : { ...emptyForm, category: defaultCategory }
+      );
       setShowNewCatInput(availableCategories.length === 0);
       setNewCatName('');
+      setValidationError('');
     }
   }, [open, initial, availableCategories]);
 
@@ -60,17 +69,25 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.imageUrl) return;
+    if (!form.imageUrl) {
+      setValidationError('Please select or upload an image before saving.');
+      return;
+    }
+    setValidationError('');
     setSaving(true);
-    await onSave({ ...form, order: Number(form.order) || 0 });
+    await onSave({
+      ...form,
+      order: Number(form.order) || 0,
+      size: Number(form.size) || (form.imageUrl ? Math.round(form.imageUrl.length * 0.75) : 0),
+    });
     setSaving(false);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 animate-fade-in">
       <div className="fixed inset-0 bg-black/80 backdrop-blur-xs" onClick={onClose} />
-      <div className="relative bg-white border-2 border-black max-w-2xl w-full p-6 sm:p-8 z-10 max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-slide-up">
+      <div className="relative bg-white border-2 border-black max-w-2xl w-full p-5 sm:p-8 z-10 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-slide-up">
         <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
           <div>
             <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
@@ -80,10 +97,16 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
               {initial ? 'EDIT GALLERY EXHIBIT' : 'ADD NEW GALLERY ITEM'}
             </h2>
           </div>
-          <button onClick={onClose} className="p-1 text-black hover:text-neutral-500 cursor-pointer">
+          <button onClick={onClose} className="p-2 text-black hover:text-neutral-500 cursor-pointer" aria-label="Close modal">
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {validationError && (
+          <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold uppercase tracking-wider">
+            {validationError}
+          </div>
+        )}
 
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -156,7 +179,14 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
             </label>
             <Base64UploadZone
               currentUrl={form.imageUrl}
-              onUploaded={(url) => setForm((p) => ({ ...p, imageUrl: url }))}
+              onUploaded={(url, size) => {
+                setForm((p) => ({
+                  ...p,
+                  imageUrl: url,
+                  size: size || p.size || 0,
+                }));
+                setValidationError('');
+              }}
             />
             <input
               name="imageUrl"
@@ -182,18 +212,24 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
             />
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-200">
             <input
               type="checkbox"
               id="gal-featured"
               name="featured"
               checked={form.featured}
               onChange={handle}
-              className="w-4 h-4 accent-black rounded-none cursor-pointer"
+              className="w-5 h-5 accent-black rounded-none cursor-pointer"
             />
-            <label htmlFor="gal-featured" className="text-xs font-bold uppercase tracking-wider text-black cursor-pointer">
-              PIN AS FEATURED EXHIBIT
-            </label>
+            <div>
+              <label htmlFor="gal-featured" className="text-xs font-bold uppercase tracking-wider text-black cursor-pointer flex items-center gap-1.5">
+                <Pin className="w-3.5 h-3.5 fill-black" />
+                <span>PIN AS FEATURED EXHIBIT (ALWAYS STAYS ON TOP)</span>
+              </label>
+              <p className="text-[11px] text-neutral-500 font-medium">
+                Pinned items will always stay at the top of the gallery on both mobile and desktop.
+              </p>
+            </div>
           </div>
 
           <div className="pt-4 border-t border-neutral-200 flex justify-end gap-3">
@@ -206,8 +242,8 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
             </button>
             <button
               type="submit"
-              disabled={saving || !form.imageUrl}
-              className="px-8 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              disabled={saving}
+              className="px-8 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-xs"
             >
               {saving ? 'SAVING...' : 'SAVE EXHIBIT'}
             </button>
@@ -227,6 +263,7 @@ const GalleryAdmin = () => {
   const [editItem, setEditItem] = useState(null);
   const [zoomItem, setZoomItem] = useState(null);
   const [filterCat, setFilterCat] = useState('all');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest' | 'size-desc' | 'size-asc'
   const [toast, setToast] = useState('');
 
   // Category management toolbar state
@@ -365,6 +402,47 @@ const GalleryAdmin = () => {
     if (filterCat === 'all') return true;
     return (i.category || '').toLowerCase() === filterCat.toLowerCase();
   });
+
+  // SORTING ALGORITHM: PINNED / FEATURED ITEMS ALWAYS STAY ON TOP!
+  const sorted = [...filtered].sort((a, b) => {
+    // 1. PINNED ITEMS ALWAYS STAY ON TOP
+    const aPinned = a.featured ? 1 : 0;
+    const bPinned = b.featured ? 1 : 0;
+    if (aPinned !== bPinned) {
+      return bPinned - aPinned; // pinned first!
+    }
+
+    // 2. Secondary sort criteria
+    if (sortBy === 'newest') {
+      const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return dateB - dateA;
+    }
+    if (sortBy === 'oldest') {
+      const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return dateA - dateB;
+    }
+    if (sortBy === 'size-desc') {
+      const sizeA = Number(a.size || (a.imageUrl ? a.imageUrl.length : 0)) || 0;
+      const sizeB = Number(b.size || (b.imageUrl ? b.imageUrl.length : 0)) || 0;
+      return sizeB - sizeA;
+    }
+    if (sortBy === 'size-asc') {
+      const sizeA = Number(a.size || (a.imageUrl ? a.imageUrl.length : 0)) || 0;
+      const sizeB = Number(b.size || (b.imageUrl ? b.imageUrl.length : 0)) || 0;
+      return sizeA - sizeB;
+    }
+    return (b.order || 0) - (a.order || 0);
+  });
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return null;
+    const num = Number(bytes);
+    if (num > 1024 * 1024) return (num / (1024 * 1024)).toFixed(1) + ' MB';
+    if (num > 1024) return Math.round(num / 1024) + ' KB';
+    return num + ' B';
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -522,21 +600,42 @@ const GalleryAdmin = () => {
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="bg-white border border-neutral-200 p-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {usedCategories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setFilterCat(cat)}
-            className={`px-3.5 py-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors cursor-pointer ${
-              filterCat.toLowerCase() === cat.toLowerCase()
-                ? 'bg-black text-white'
-                : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
-            }`}
+      {/* Filter Tabs & Real-Time Sort Controls */}
+      <div className="bg-white border border-neutral-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Categories */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-1">
+          {usedCategories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCat(cat)}
+              className={`px-3.5 py-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors cursor-pointer ${
+                filterCat.toLowerCase() === cat.toLowerCase()
+                  ? 'bg-black text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
+              }`}
+            >
+              {cat === 'all' ? 'ALL EXHIBITS' : cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Sort Dropdown */}
+        <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 md:border-l border-neutral-200 pt-3 md:pt-0 md:pl-4">
+          <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 flex items-center gap-1">
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            <span>SORT:</span>
+          </span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-neutral-100 border border-neutral-300 text-black text-xs font-bold p-2 focus:outline-none focus:border-black uppercase tracking-wider cursor-pointer"
           >
-            {cat === 'all' ? 'ALL EXHIBITS' : cat}
-          </button>
-        ))}
+            <option value="newest">LATEST DATE (NEWEST)</option>
+            <option value="oldest">OLDEST DATE</option>
+            <option value="size-desc">LARGEST FILE SIZE</option>
+            <option value="size-asc">SMALLEST FILE SIZE</option>
+          </select>
+        </div>
       </div>
 
       {/* Grid */}
@@ -549,7 +648,7 @@ const GalleryAdmin = () => {
             </div>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div className="border-2 border-dashed border-neutral-300 p-16 text-center space-y-3 bg-white">
           <Image className="w-12 h-12 text-neutral-400 mx-auto stroke-[1.5]" />
           <p className="text-base font-black uppercase text-black">NO GALLERY ITEMS PUBLISHED</p>
@@ -569,10 +668,12 @@ const GalleryAdmin = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((item) => (
+          {sorted.map((item) => (
             <div
               key={item.id}
-              className="bg-white border border-neutral-200 hover:border-black flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+              className={`bg-white border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group flex flex-col justify-between ${
+                item.featured ? 'border-2 border-black' : 'border-neutral-200 hover:border-black'
+              }`}
             >
               <div>
                 <div
@@ -584,17 +685,24 @@ const GalleryAdmin = () => {
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute top-2 left-2 flex gap-1.5 z-10">
+                  <div className="absolute top-2 left-2 flex flex-wrap gap-1.5 z-10">
                     <span className="bg-black text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5">
                       {item.category || 'EXHIBIT'}
                     </span>
                     {item.featured && (
-                      <span className="bg-amber-500 text-black text-[9px] font-black uppercase tracking-widest px-2 py-0.5 flex items-center gap-1">
-                        <Star className="w-2.5 h-2.5 fill-black" />
-                        <span>FEATURED</span>
+                      <span className="bg-amber-400 text-black text-[9px] font-black uppercase tracking-widest px-2 py-0.5 flex items-center gap-1 shadow-xs">
+                        <Pin className="w-2.5 h-2.5 fill-black" />
+                        <span>PINNED TO TOP</span>
                       </span>
                     )}
                   </div>
+                  {item.size && (
+                    <div className="absolute bottom-2 right-2 z-10">
+                      <span className="bg-black/80 backdrop-blur-xs text-white text-[9px] font-mono px-2 py-0.5">
+                        {formatFileSize(item.size)}
+                      </span>
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="bg-black text-white text-xs font-bold uppercase tracking-widest px-3 py-1.5 flex items-center gap-1.5 shadow-md">
                       <ZoomIn className="w-3.5 h-3.5" />
@@ -604,9 +712,11 @@ const GalleryAdmin = () => {
                 </div>
 
                 <div className="p-5 space-y-2">
-                  <h3 className="text-base font-black uppercase tracking-tight text-black group-hover:underline">
-                    {item.title}
-                  </h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-black uppercase tracking-tight text-black group-hover:underline">
+                      {item.title}
+                    </h3>
+                  </div>
                   {item.description && (
                     <p className="text-xs text-neutral-600 line-clamp-2 leading-relaxed">
                       {item.description}
