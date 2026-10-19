@@ -1,78 +1,100 @@
-// useFirestore Hook
-import { useState, useEffect, useCallback } from 'react';
+// useFirestore Hook with Live Multi-Device Real-Time Synchronization
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as firestoreService from '../services/firebase/firestore';
 
 export const useFirestore = (collectionName) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Set up live real-time WebSocket listener across all devices
+  useEffect(() => {
+    if (!collectionName) return;
+
+    setLoading(true);
+    const unsubscribe = firestoreService.subscribeToCollection(collectionName, (realtimeDocs) => {
+      if (isMountedRef.current) {
+        setData(realtimeDocs || []);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [collectionName]);
 
   const getCollection = useCallback(async (constraints = []) => {
     setLoading(true);
     setError(null);
     try {
       const result = await firestoreService.getCollection(collectionName, constraints);
-      setData(result || []);
+      if (isMountedRef.current) {
+        setData(result || []);
+      }
       return result || [];
     } catch (err) {
       console.warn(`useFirestore [${collectionName}]:`, err?.message || err);
-      setError(err);
-      setData([]);
+      if (isMountedRef.current) {
+        setError(err);
+      }
       return [];
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [collectionName]);
 
-  // Automatically fetch on mount or collectionName change
-  useEffect(() => {
-    if (collectionName) {
-      getCollection();
-    }
-  }, [collectionName, getCollection]);
-
   const addDoc = useCallback(async (docData) => {
-    setLoading(true);
     setError(null);
     try {
       const result = await firestoreService.addDocument(collectionName, docData);
-      setData(prev => [result, ...prev.filter(item => item.id !== result.id)]);
+      if (isMountedRef.current) {
+        setData(prev => [result, ...prev.filter(item => item.id !== result.id)]);
+      }
       return result;
     } catch (err) {
-      setError(err);
+      if (isMountedRef.current) setError(err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [collectionName]);
 
   const updateDoc = useCallback(async (docId, docData) => {
-    setLoading(true);
     setError(null);
     try {
       const result = await firestoreService.updateDocument(collectionName, docId, docData);
-      setData(prev => prev.map(item => item.id === docId ? { ...item, ...result } : item));
+      if (isMountedRef.current) {
+        setData(prev => prev.map(item => item.id === docId ? { ...item, ...result } : item));
+      }
       return result;
     } catch (err) {
-      setError(err);
+      if (isMountedRef.current) setError(err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [collectionName]);
 
   const deleteDoc = useCallback(async (docId) => {
-    setLoading(true);
     setError(null);
     try {
       await firestoreService.deleteDocument(collectionName, docId);
-      setData(prev => prev.filter(item => item.id !== docId));
+      if (isMountedRef.current) {
+        setData(prev => prev.filter(item => item.id !== docId));
+      }
       return true;
     } catch (err) {
-      setError(err);
+      if (isMountedRef.current) setError(err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [collectionName]);
 

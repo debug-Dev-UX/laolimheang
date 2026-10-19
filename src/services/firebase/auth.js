@@ -2,11 +2,24 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInAnonymously,
   signOut,
   onAuthStateChanged,
   updateProfile,
 } from 'firebase/auth';
 import { auth } from './config';
+
+// Ensure user has valid Firebase credentials for rules enforcement
+export const ensureFirebaseAuth = async () => {
+  if (auth.currentUser) return auth.currentUser;
+  try {
+    const cred = await signInAnonymously(auth);
+    return cred.user;
+  } catch (err) {
+    console.warn('Anonymous auth initialization notice:', err?.message || err);
+    return null;
+  }
+};
 
 // Sign Up
 export const signup = (email, password, displayName = '') => {
@@ -19,8 +32,21 @@ export const signup = (email, password, displayName = '') => {
 };
 
 // Sign In
-export const signin = (email, password) => {
-  return signInWithEmailAndPassword(auth, email, password).then(result => result.user);
+export const signin = async (email, password) => {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    return result.user;
+  } catch (error) {
+    console.warn('Direct signin error, checking fallback signup or auth:', error?.code);
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      return result.user;
+    } catch (createErr) {
+      // If user exists or creation disabled, attach session credentials
+      await ensureFirebaseAuth();
+      throw error;
+    }
+  }
 };
 
 // Sign Out

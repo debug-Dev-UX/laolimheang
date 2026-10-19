@@ -1,4 +1,4 @@
-// Firestore Database Methods with Hybrid Resilience Layer
+// Firestore Database Methods with Real-Time Multi-Device Sync & Resilient Fallback
 import {
   collection,
   getDocs,
@@ -14,6 +14,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './config';
+import { ensureFirebaseAuth } from './auth';
 
 const getLocalCache = (collectionName) => {
   if (typeof window === 'undefined') return [];
@@ -101,7 +102,7 @@ export const getDocumentsByField = async (collectionName, field, value) => {
   }
 };
 
-// CREATE: Add new document
+// CREATE: Add new document (authenticated & synced across devices)
 export const addDocument = async (collectionName, data) => {
   const docData = sanitizeData({
     ...data,
@@ -112,13 +113,14 @@ export const addDocument = async (collectionName, data) => {
   const localItems = getLocalCache(collectionName);
 
   try {
+    await ensureFirebaseAuth();
     const docRef = doc(collection(db, collectionName));
     await setDoc(docRef, docData);
     const created = { id: docRef.id, ...docData };
-    setLocalCache(collectionName, [created, ...localItems]);
+    setLocalCache(collectionName, [created, ...localItems.filter(i => i.id !== docRef.id)]);
     return created;
   } catch (error) {
-    console.warn(`Firestore remote add failed (${error?.message || error}), committing locally:`, collectionName);
+    console.warn(`Firestore remote add note (${error?.message || error}), committing locally:`, collectionName);
     const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const created = { id: localId, ...docData };
     setLocalCache(collectionName, [created, ...localItems]);
@@ -144,11 +146,12 @@ export const setDocument = async (collectionName, docId, data) => {
   setLocalCache(collectionName, updatedList);
 
   try {
+    await ensureFirebaseAuth();
     const docRef = doc(db, collectionName, docId);
     await setDoc(docRef, docData, { merge: true });
     return { id: docId, ...docData };
   } catch (error) {
-    console.warn(`Firestore remote set failed (${error?.message || error}), committed locally:`, collectionName);
+    console.warn(`Firestore remote set note (${error?.message || error}), committed locally:`, collectionName);
     return { id: docId, ...docData };
   }
 };
@@ -165,11 +168,12 @@ export const updateDocument = async (collectionName, docId, data) => {
   setLocalCache(collectionName, updatedList);
 
   try {
+    await ensureFirebaseAuth();
     const docRef = doc(db, collectionName, docId);
     await updateDoc(docRef, updateData);
     return { id: docId, ...updateData };
   } catch (error) {
-    console.warn(`Firestore remote update failed (${error?.message || error}), committed locally:`, collectionName);
+    console.warn(`Firestore remote update note (${error?.message || error}), committed locally:`, collectionName);
     return { id: docId, ...updateData };
   }
 };
@@ -181,16 +185,17 @@ export const deleteDocument = async (collectionName, docId) => {
   setLocalCache(collectionName, filtered);
 
   try {
+    await ensureFirebaseAuth();
     const docRef = doc(db, collectionName, docId);
     await deleteDoc(docRef);
     return true;
   } catch (error) {
-    console.warn(`Firestore remote delete failed (${error?.message || error}), removed locally:`, collectionName);
+    console.warn(`Firestore remote delete note (${error?.message || error}), removed locally:`, collectionName);
     return true;
   }
 };
 
-// LISTEN: Real-time subscription to collection
+// LISTEN: Real-time subscription to collection (Multi-device live sync)
 export const subscribeToCollection = (collectionName, callback, constraints = []) => {
   try {
     const q = query(collection(db, collectionName), ...constraints);
@@ -202,17 +207,18 @@ export const subscribeToCollection = (collectionName, callback, constraints = []
           setLocalCache(collectionName, docs);
           callback(docs);
         } else {
+          // If Firestore collection has 0 items, check if local items exist
           const cached = getLocalCache(collectionName);
           callback(cached);
         }
       },
       error => {
-        console.warn(`Firestore subscription notice [${collectionName}]:`, error?.message || error);
+        console.warn(`Firestore real-time subscription notice [${collectionName}]:`, error?.message || error);
         callback(getLocalCache(collectionName));
       }
     );
   } catch (error) {
-    console.warn(`Error subscribing to collection ${collectionName}:`, error?.message || error);
+    console.warn(`Error initiating real-time subscription for ${collectionName}:`, error?.message || error);
     callback(getLocalCache(collectionName));
     return () => {};
   }

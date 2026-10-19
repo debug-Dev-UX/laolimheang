@@ -1,37 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getCollection } from '../services/firebase/firestore';
+import { subscribeToCollection } from '../services/firebase/firestore';
 import { COLLECTIONS, ROUTES } from '../utils/constants';
 import { useAuth } from '../hooks/useAuth';
-import { Image, Eye, X, Plus } from 'lucide-react';
+import ImageZoomModal from '../components/common/ImageZoomModal';
+import { Image, Eye, Plus, Sparkles, ZoomIn } from 'lucide-react';
 
 const Gallery = () => {
   const { isAdmin, user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('ALL');
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState(null);
 
+  // Real-time synchronization across devices
   useEffect(() => {
-    loadGallery();
-  }, []);
-
-  const loadGallery = async () => {
-    try {
-      setLoading(true);
-      const data = await getCollection(COLLECTIONS.GALLERY);
+    setLoading(true);
+    const unsubscribe = subscribeToCollection(COLLECTIONS.GALLERY, (data) => {
       if (data && data.length > 0) {
         setItems(data.sort((a, b) => (b.order || 0) - (a.order || 0)));
       } else {
         setItems([]);
       }
-    } catch (e) {
-      console.warn('Error loading gallery items from database:', e);
-      setItems([]);
-    } finally {
       setLoading(false);
-    }
-  };
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
 
   const categories = [
     'ALL',
@@ -43,6 +40,20 @@ const Gallery = () => {
     return (item.category || '').toUpperCase() === activeFilter;
   });
 
+  const selectedItem = selectedIndex !== null ? filtered[selectedIndex] : null;
+
+  const handlePrev = () => {
+    if (selectedIndex !== null && selectedIndex > 0) {
+      setSelectedIndex(selectedIndex - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (selectedIndex !== null && selectedIndex < filtered.length - 1) {
+      setSelectedIndex(selectedIndex + 1);
+    }
+  };
+
   return (
     <div className="bg-white text-neutral-900 min-h-screen selection:bg-black selection:text-white">
       {/* ── Category Header (Zando Lookbook Style) ── */}
@@ -51,26 +62,30 @@ const Gallery = () => {
           <div className="flex items-center gap-2 text-[11px] font-bold tracking-widest uppercase text-neutral-500">
             <Link to={ROUTES.HOME} className="hover:text-black">HOME</Link>
             <span>/</span>
-            <span className="text-black">GALLERY & LOOKBOOK</span>
+            <span className="text-black">GALLERY &amp; LOOKBOOK</span>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-black text-white text-[10px] font-black uppercase tracking-widest mb-2">
+                <Sparkles className="w-3 h-3 text-emerald-400" />
+                <span>REAL-TIME CURATED EXHIBIT</span>
+              </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase text-black">
-                DESIGN GALLERY & VISUAL LOOKBOOK
+                DESIGN GALLERY &amp; VISUAL LOOKBOOK
               </h1>
               <p className="text-xs sm:text-sm text-neutral-600 font-medium max-w-2xl mt-1">
-                Curated archive of user interface prototypes, architectural system designs, and production dashboards.
+                Curated archive of user interface prototypes, architectural system designs, and production dashboards. Click any asset to inspect and zoom up to 400%.
               </p>
             </div>
 
             {isAdmin && user && (
               <Link
                 to={ROUTES.ADMIN_GALLERY}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-all active:scale-95 shrink-0"
+                className="inline-flex items-center gap-1.5 px-5 py-3 bg-black text-white text-xs font-black uppercase tracking-widest hover:bg-neutral-800 transition-all active:scale-95 shrink-0 shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add / Manage Gallery</span>
+                <Plus className="w-4 h-4" />
+                <span>MANAGE GALLERY</span>
               </Link>
             )}
           </div>
@@ -83,7 +98,10 @@ const Gallery = () => {
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => setActiveFilter(cat)}
+              onClick={() => {
+                setActiveFilter(cat);
+                setSelectedIndex(null);
+              }}
               className={`px-4 py-2 text-xs font-bold tracking-widest uppercase whitespace-nowrap transition-all duration-200 active:scale-95 ${
                 activeFilter === cat
                   ? 'bg-black text-white shadow-xs'
@@ -133,10 +151,10 @@ const Gallery = () => {
         ) : (
           /* Gallery Grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filtered.map((item) => (
+            {filtered.map((item, idx) => (
               <div
                 key={item.id}
-                onClick={() => setSelectedItem(item)}
+                onClick={() => setSelectedIndex(idx)}
                 className="border border-neutral-200 hover:border-black p-4 bg-white cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group flex flex-col justify-between"
               >
                 <div className="space-y-3">
@@ -150,10 +168,10 @@ const Gallery = () => {
                     <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 shadow-xs">
                       {item.category || 'EXHIBIT'}
                     </div>
-                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="bg-black text-white text-xs font-bold uppercase tracking-widest px-3 py-1.5 flex items-center gap-1.5 shadow-md">
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>QUICK VIEW</span>
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="bg-black text-white text-xs font-bold uppercase tracking-widest px-3.5 py-2 flex items-center gap-1.5 shadow-md">
+                        <ZoomIn className="w-4 h-4" />
+                        <span>INSPECT &amp; ZOOM</span>
                       </span>
                     </div>
                   </div>
@@ -172,9 +190,9 @@ const Gallery = () => {
 
                 {item.tags && item.tags.length > 0 && (
                   <div className="pt-4 mt-4 border-t border-neutral-100 flex flex-wrap gap-1">
-                    {item.tags.map((tag, idx) => (
+                    {item.tags.map((tag, tagIdx) => (
                       <span
-                        key={idx}
+                        key={tagIdx}
                         className="text-[9px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-600 px-1.5 py-0.5"
                       >
                         {tag}
@@ -188,56 +206,20 @@ const Gallery = () => {
         )}
       </main>
 
-      {/* ── Quick-View Lightbox Modal ── */}
+      {/* ── High-Resolution Interactive Zoom Lightbox Modal ── */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-xs"
-            onClick={() => setSelectedItem(null)}
-          />
-          <div className="relative bg-white border-2 border-black max-w-4xl w-full p-6 sm:p-8 z-10 max-h-[90vh] overflow-y-auto space-y-4 animate-slide-up shadow-2xl">
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
-                  {selectedItem.category}
-                </span>
-                <h3 className="text-xl font-black uppercase tracking-tight text-black">
-                  {selectedItem.title}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="p-1 text-black hover:text-neutral-500 transition-colors"
-                aria-label="Close modal"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="border border-neutral-200 overflow-hidden bg-neutral-900">
-              <img
-                src={selectedItem.image || selectedItem.imageUrl || selectedItem.url}
-                alt={selectedItem.title}
-                className="w-full h-auto max-h-[60vh] object-contain mx-auto"
-              />
-            </div>
-
-            {selectedItem.description && (
-              <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed pt-2">
-                {selectedItem.description}
-              </p>
-            )}
-
-            <div className="pt-4 border-t border-neutral-200 flex justify-end">
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="px-6 py-2.5 bg-black text-white hover:bg-neutral-800 text-xs font-bold tracking-widest uppercase transition-all active:scale-95"
-              >
-                CLOSE PREVIEW
-              </button>
-            </div>
-          </div>
-        </div>
+        <ImageZoomModal
+          isOpen={!!selectedItem}
+          onClose={() => setSelectedIndex(null)}
+          imageUrl={selectedItem.image || selectedItem.imageUrl || selectedItem.url}
+          title={selectedItem.title}
+          category={selectedItem.category}
+          description={selectedItem.description}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          hasPrev={selectedIndex > 0}
+          hasNext={selectedIndex < filtered.length - 1}
+        />
       )}
     </div>
   );

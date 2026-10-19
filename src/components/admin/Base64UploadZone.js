@@ -1,29 +1,30 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { uploadFileWithProgress, generateUniqueFileName } from '../../services/firebase/storage';
+import {
+  UploadCloud,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  FileImage,
+  Loader2,
+  ExternalLink,
+  Sparkles,
+} from 'lucide-react';
 
-// Common Admin Styles for the Zone
-const zoneStyle = {
-  border: '2px dashed',
-  borderRadius: 12,
-  padding: '28px 20px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 120,
-  transition: 'all 0.2s',
-  userSelect: 'none',
-};
-
-const progressRingStyle = { position: 'relative', width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' };
-const uploadIconStyle   = { width: 44, height: 44, borderRadius: 12, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' };
-
-export const Base64UploadZone = ({ currentUrl, onUploaded }) => {
-  const [dragging,  setDragging]  = useState(false);
+export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', maxSizeMB = 150 }) => {
+  const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [progress,  setProgress]  = useState(0);
-  const [error,     setError]     = useState('');
+  const [progress, setProgress] = useState(0);
+  const [uploadedBytes, setUploadedBytes] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
+  const [error, setError] = useState('');
+  const [fileDetails, setFileDetails] = useState(null);
   const inputRef = useRef(null);
 
-  const compressAndConvertToBase64 = (file) => {
+  const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
+
+  // High-performance client-side fallback optimizer if cloud storage is unreachable
+  const processLargeImageFallback = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -35,148 +36,220 @@ export const Base64UploadZone = ({ currentUrl, onUploaded }) => {
           let width = img.width;
           let height = img.height;
 
-          // Max dimensions
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
+          // Maximum resolution (4K ultra high definition)
+          const MAX_DIM = 3840;
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            } else {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
             }
           }
 
           canvas.width = width;
           canvas.height = height;
-
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Compress to WebP with 0.7 quality to keep size small for Firestore limits
-          const dataUrl = canvas.toDataURL('image/webp', 0.7);
-          
-          // Check size (~1MB limit in Firestore)
-          const sizeInBytes = Math.round((dataUrl.length * 3) / 4);
-          if (sizeInBytes > 950000) {
-            reject(new Error("Image is still too large after compression. Please use a smaller image."));
-            return;
-          }
-
+          // WebP format at high 0.85 quality
+          const dataUrl = canvas.toDataURL('image/webp', 0.85);
           resolve(dataUrl);
         };
-        img.onerror = (err) => reject(err);
+        img.onerror = () => reject(new Error('Failed to decode image data.'));
       };
-      reader.onerror = (err) => reject(err);
+      reader.onerror = () => reject(new Error('Failed to read file from disk.'));
     });
   };
 
-  const handleFile = useCallback(async (file) => {
-    if (!file) return;
-    
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!allowedTypes.includes(file.type)) {
-      setError("Only JPG, PNG, WebP, and GIF images are allowed.");
-      return;
-    }
+  const handleFile = useCallback(
+    async (file) => {
+      if (!file) return;
 
-    setError('');
-    setUploading(true);
-    setProgress(30);
+      const sizeMB = file.size / (1024 * 1024);
+      if (sizeMB > maxSizeMB) {
+        setError(`File size (${sizeMB.toFixed(1)}MB) exceeds maximum allowed ${maxSizeMB}MB.`);
+        return;
+      }
 
-    try {
-      const base64Url = await compressAndConvertToBase64(file);
-      setProgress(100);
-      onUploaded(base64Url);
-      setUploading(false);
-    } catch (err) {
-      console.error("Compression error:", err);
-      setError(err.message || 'Failed to compress image.');
-      setUploading(false);
-      setProgress(0);
-    }
-  }, [onUploaded]);
+      setError('');
+      setUploading(true);
+      setProgress(5);
+      setUploadedBytes(0);
+      setTotalBytes(file.size);
+      setFileDetails({
+        name: file.name,
+        sizeMB: sizeMB.toFixed(1),
+        type: file.type,
+      });
 
-  const onDrop      = useCallback((e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }, [handleFile]);
-  const onDragOver  = (e) => { e.preventDefault(); setDragging(true); };
+      try {
+        // Attempt 1: Upload directly to Firebase Cloud Storage (Supports +100MB chunked upload)
+        const uniqueName = generateUniqueFileName(file.name);
+        const res = await uploadFileWithProgress(folder, uniqueName, file, (pct, loaded, total) => {
+          setProgress(pct);
+          setUploadedBytes(loaded);
+          setTotalBytes(total);
+        });
+
+        if (res && res.url) {
+          setProgress(100);
+          onUploaded(res.url);
+          setUploading(false);
+          return;
+        }
+      } catch (storageErr) {
+        console.warn('Direct Storage upload warning, switching to high-definition optimizer:', storageErr);
+      }
+
+      // Attempt 2: High-capacity fallback optimizer
+      try {
+        setProgress(50);
+        const optimizedUrl = await processLargeImageFallback(file);
+        setProgress(100);
+        onUploaded(optimizedUrl);
+        setUploading(false);
+      } catch (fallbackErr) {
+        console.error('Upload processing failed:', fallbackErr);
+        setError('Upload failed: ' + (fallbackErr?.message || 'Could not process media.'));
+        setUploading(false);
+        setProgress(0);
+      }
+    },
+    [folder, maxSizeMB, onUploaded]
+  );
+
+  const onDragOver = (e) => {
+    e.preventDefault();
+    setDragging(true);
+  };
+
   const onDragLeave = () => setDragging(false);
 
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
   return (
-    <div>
+    <div className="space-y-3">
+      {/* Upload Drop Zone */}
       <div
-        style={{
-          ...zoneStyle,
-          borderColor: dragging ? '#a855f7' : currentUrl ? 'rgba(168,85,247,0.5)' : 'rgba(99,102,241,0.25)',
-          background:  dragging ? 'rgba(168,85,247,0.08)' : 'rgba(15,15,30,0.6)',
-          cursor: uploading ? 'default' : 'pointer',
-        }}
-        onDrop={onDrop}
+        onClick={() => inputRef.current && inputRef.current.click()}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
-        onClick={() => !uploading && inputRef.current?.click()}
+        onDrop={onDrop}
+        className={`border-2 border-dashed p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+          dragging
+            ? 'border-black bg-neutral-100 scale-[1.01]'
+            : 'border-neutral-300 hover:border-black bg-neutral-50 hover:bg-white'
+        } ${uploading ? 'pointer-events-none opacity-80' : ''}`}
       >
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={e => handleFile(e.target.files[0])}
+          accept="image/*,video/mp4,video/webm"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              handleFile(e.target.files[0]);
+            }
+          }}
         />
 
         {uploading ? (
-          <div style={{ textAlign: 'center' }}>
-            <div style={progressRingStyle}>
-              <svg width="52" height="52" viewBox="0 0 52 52">
-                <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(99,102,241,0.15)" strokeWidth="4"/>
-                <circle
-                  cx="26" cy="26" r="22" fill="none"
-                  stroke="#a855f7" strokeWidth="4"
-                  strokeDasharray={`${138.23 * progress / 100} 138.23`}
-                  strokeLinecap="round"
-                  style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dasharray 0.3s ease' }}
-                />
-              </svg>
-              <span style={{ position: 'absolute', fontSize: 12, fontWeight: 700, color: '#c084fc' }}>{progress}%</span>
+          <div className="space-y-4 w-full max-w-xs">
+            <div className="w-12 h-12 bg-black text-white flex items-center justify-center mx-auto rounded-full animate-pulse">
+              <Loader2 className="w-6 h-6 animate-spin" />
             </div>
-            <p style={{ color: '#64748b', fontSize: 13, margin: '8px 0 6px' }}>Compressing Image…</p>
-          </div>
-        ) : currentUrl ? (
-          <div style={{ textAlign: 'center' }}>
-            <img
-              src={currentUrl} alt="preview"
-              style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(168,85,247,0.4)', marginBottom: 8 }}
-              onError={e => { e.target.style.display = 'none'; }}
-            />
-            <p style={{ color: '#34d399', fontSize: 12, margin: 0, fontWeight: 600 }}>✓ Ready — click or drop to replace</p>
+            <div>
+              <span className="text-xs font-black uppercase tracking-wider text-black block">
+                UPLOADING HIGH-CAPACITY ASSET ({progress}%)
+              </span>
+              {fileDetails && (
+                <span className="text-[11px] text-neutral-500 font-medium block mt-0.5">
+                  {formatMB(uploadedBytes)}MB / {formatMB(totalBytes)}MB &bull; {fileDetails.name}
+                </span>
+              )}
+            </div>
+            {/* Real-time Progress Bar */}
+            <div className="w-full h-2 bg-neutral-200 overflow-hidden">
+              <div
+                className="h-full bg-black transition-all duration-200 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
         ) : (
-          <div style={{ textAlign: 'center' }}>
-            <div style={uploadIconStyle}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
+          <div className="space-y-3">
+            <div className="w-12 h-12 bg-white border border-neutral-300 flex items-center justify-center mx-auto text-black shadow-xs">
+              <UploadCloud className="w-6 h-6 stroke-[1.8]" />
             </div>
-            <p style={{ color: '#94a3b8', fontSize: 13, margin: '6px 0 2px' }}>
-              <strong style={{ color: '#c084fc' }}>Drag & drop</strong> or click to select
-            </p>
-            <p style={{ color: '#475569', fontSize: 11, margin: 0 }}>Will be converted to Base64 directly</p>
+            <div>
+              <span className="text-xs font-black uppercase tracking-wider text-black block">
+                DRAG &amp; DROP HIGH-RES MEDIA OR CLICK TO BROWSE
+              </span>
+              <p className="text-[11px] text-neutral-500 font-medium mt-1">
+                Supports Photography, RAW, 4K Blueprints &amp; Videos up to <span className="font-bold text-black">+{maxSizeMB}MB</span>
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-black text-white text-[9px] font-black uppercase tracking-widest">
+              <span>UP TO 150MB ACCEPTED</span>
+            </div>
           </div>
         )}
       </div>
 
+      {/* Error Notice */}
       {error && (
-        <p style={{ color: '#f87171', fontSize: 12, margin: '8px 0 0', display: 'flex', alignItems: 'flex-start', gap: 6, lineHeight: 1.5 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 2 }}>
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          {error}
-        </p>
+        <div className="p-3 bg-neutral-100 border border-neutral-300 text-xs font-bold text-black flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-black shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Current Upload Preview */}
+      {currentUrl && (
+        <div className="p-3 bg-white border border-neutral-200 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 flex items-center justify-center">
+              <img
+                src={currentUrl}
+                alt="Uploaded preview"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block">
+                ACTIVE ASSET ATTACHED
+              </span>
+              <span className="text-xs font-bold text-black truncate block mt-0.5">
+                {currentUrl.startsWith('data:') ? 'Embedded High-Definition Media Payload' : currentUrl}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onUploaded('')}
+              className="p-1.5 border border-neutral-300 text-neutral-500 hover:text-black hover:border-black transition-colors"
+              title="Remove asset"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
 };
+
+export default Base64UploadZone;

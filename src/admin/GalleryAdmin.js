@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { COLLECTIONS } from '../utils/constants';
 import { Base64UploadZone } from '../components/admin/Base64UploadZone';
+import ImageZoomModal from '../components/common/ImageZoomModal';
 import {
   Image,
   Plus,
@@ -12,6 +13,7 @@ import {
   CheckCircle2,
   Star,
   Eye,
+  ZoomIn,
 } from 'lucide-react';
 
 const CATEGORIES = ['Photography', 'Design', 'Web Development', 'Branding', 'Art', 'UI/UX', 'Other'];
@@ -168,6 +170,7 @@ const GalleryAdmin = () => {
   const { data: items, loading, add, update, remove } = useFirestore(COLLECTIONS.GALLERY);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [zoomItem, setZoomItem] = useState(null);
   const [filterCat, setFilterCat] = useState('all');
   const [toast, setToast] = useState('');
 
@@ -299,13 +302,16 @@ const GalleryAdmin = () => {
               className="bg-white border border-neutral-200 hover:border-black flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
             >
               <div>
-                <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden border-b border-neutral-200">
+                <div
+                  className="relative aspect-[4/3] bg-neutral-100 overflow-hidden border-b border-neutral-200 cursor-pointer"
+                  onClick={() => setZoomItem(item)}
+                >
                   <img
                     src={item.imageUrl || item.image || item.url}
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute top-2 left-2 flex gap-1.5">
+                  <div className="absolute top-2 left-2 flex gap-1.5 z-10">
                     <span className="bg-black text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5">
                       {item.category || 'EXHIBIT'}
                     </span>
@@ -315,6 +321,12 @@ const GalleryAdmin = () => {
                         <span>FEATURED</span>
                       </span>
                     )}
+                  </div>
+                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="bg-black text-white text-xs font-bold uppercase tracking-widest px-3 py-1.5 flex items-center gap-1.5 shadow-md">
+                      <ZoomIn className="w-3.5 h-3.5" />
+                      <span>INSPECT &amp; ZOOM</span>
+                    </span>
                   </div>
                 </div>
 
@@ -355,6 +367,18 @@ const GalleryAdmin = () => {
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleSave} initial={editItem} />
+
+      {/* Image Zoom Inspection Modal */}
+      {zoomItem && (
+        <ImageZoomModal
+          isOpen={!!zoomItem}
+          onClose={() => setZoomItem(null)}
+          imageUrl={zoomItem.imageUrl || zoomItem.image || zoomItem.url}
+          title={zoomItem.title}
+          category={zoomItem.category}
+          description={zoomItem.description}
+        />
+      )}
     </div>
   );
 };
