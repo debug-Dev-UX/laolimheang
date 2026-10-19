@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { uploadFileWithProgress, generateUniqueFileName } from '../../services/firebase/storage';
+import { ImageCropModal } from '../common/ImageCropModal';
 import {
   UploadCloud,
   CheckCircle2,
@@ -9,6 +10,7 @@ import {
   Loader2,
   ExternalLink,
   Sparkles,
+  Crop,
 } from 'lucide-react';
 
 export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', maxSizeMB = 150 }) => {
@@ -19,6 +21,8 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
   const [totalBytes, setTotalBytes] = useState(0);
   const [error, setError] = useState('');
   const [fileDetails, setFileDetails] = useState(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState('');
   const inputRef = useRef(null);
 
   const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
@@ -161,6 +165,8 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
         setProgress(100);
         setUploadedBytes(file.size);
         onUploaded(optimizedUrl, file.size);
+        setImageToCrop(optimizedUrl);
+        setCropModalOpen(true);
         setUploading(false);
 
         // Attempt background cloud storage archival if storage is available
@@ -294,7 +300,19 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setImageToCrop(currentUrl);
+                setCropModalOpen(true);
+              }}
+              className="px-3 py-1.5 bg-black hover:bg-neutral-800 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Crop and center subject"
+            >
+              <Crop className="w-3.5 h-3.5" />
+              <span>CROP &amp; CENTER</span>
+            </button>
             <button
               type="button"
               onClick={() => onUploaded('', 0)}
@@ -305,6 +323,19 @@ export const Base64UploadZone = ({ currentUrl, onUploaded, folder = 'gallery', m
             </button>
           </div>
         </div>
+      )}
+
+      {/* Interactive Crop & Re-Center Modal */}
+      {cropModalOpen && imageToCrop && (
+        <ImageCropModal
+          isOpen={cropModalOpen}
+          imageUrl={imageToCrop}
+          onClose={() => setCropModalOpen(false)}
+          onCropComplete={(croppedDataUrl, size) => {
+            onUploaded(croppedDataUrl, size);
+          }}
+          initialAspect="4:3"
+        />
       )}
     </div>
   );
