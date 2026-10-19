@@ -9,6 +9,7 @@ import {
   Edit3,
   Trash2,
   X,
+  Check,
   Sparkles,
   CheckCircle2,
   Star,
@@ -19,8 +20,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 
-const DEFAULT_CATEGORIES = ['Photography', 'Design', 'Web Development', 'Branding', 'Art', 'UI/UX', 'Other'];
-const emptyForm = { title: '', category: 'Design', description: '', imageUrl: '', featured: false, order: 0 };
+const emptyForm = { title: '', category: '', description: '', imageUrl: '', featured: false, order: 0 };
 
 /* ─── Modal ─── */
 const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCategory }) => {
@@ -31,11 +31,12 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? { ...emptyForm, ...initial } : emptyForm);
-      setShowNewCatInput(false);
+      const defaultCategory = initial?.category || (availableCategories && availableCategories[0]) || '';
+      setForm(initial ? { ...emptyForm, ...initial } : { ...emptyForm, category: defaultCategory });
+      setShowNewCatInput(availableCategories.length === 0);
       setNewCatName('');
     }
-  }, [open, initial]);
+  }, [open, initial, availableCategories]);
 
   if (!open) return null;
 
@@ -78,7 +79,7 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
               {initial ? 'EDIT GALLERY EXHIBIT' : 'ADD NEW GALLERY ITEM'}
             </h2>
           </div>
-          <button onClick={onClose} className="p-1 text-black hover:text-neutral-500">
+          <button onClick={onClose} className="p-1 text-black hover:text-neutral-500 cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -102,19 +103,19 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black uppercase tracking-wider text-black">
-                  CATEGORY
+                  CATEGORY *
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowNewCatInput(!showNewCatInput)}
-                  className="text-[10px] font-bold uppercase tracking-wider text-black hover:underline inline-flex items-center gap-1"
+                  className="text-[10px] font-bold uppercase tracking-wider text-black hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
                   <span>{showNewCatInput ? 'SELECT EXISTING' : '+ NEW CATEGORY'}</span>
                 </button>
               </div>
 
-              {showNewCatInput ? (
+              {showNewCatInput || availableCategories.length === 0 ? (
                 <div className="flex items-center gap-1.5 mt-1">
                   <input
                     type="text"
@@ -127,7 +128,7 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
                     type="button"
                     onClick={handleCreateCategory}
                     disabled={!newCatName.trim()}
-                    className="px-3 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 disabled:opacity-50"
+                    className="px-3 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 disabled:opacity-50 cursor-pointer"
                   >
                     ADD
                   </button>
@@ -137,6 +138,7 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
                   name="category"
                   value={form.category}
                   onChange={handle}
+                  required
                   className="w-full bg-neutral-100 border border-neutral-300 text-black text-xs font-medium p-3 focus:outline-none focus:border-black uppercase tracking-wider"
                 >
                   {availableCategories.map((c) => (
@@ -197,14 +199,14 @@ const Modal = ({ open, onClose, onSave, initial, availableCategories, onAddCateg
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 border border-neutral-300 text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors"
+              className="px-6 py-3 border border-neutral-300 text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors cursor-pointer"
             >
               CANCEL
             </button>
             <button
               type="submit"
               disabled={saving || !form.imageUrl}
-              className="px-8 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+              className="px-8 py-3 bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               {saving ? 'SAVING...' : 'SAVE EXHIBIT'}
             </button>
@@ -221,6 +223,7 @@ const GalleryAdmin = () => {
   const {
     data: customCategoryDocs,
     add: addCategoryDoc,
+    update: updateCategoryDoc,
     remove: removeCategoryDoc,
   } = useFirestore(COLLECTIONS.GALLERY_CATEGORIES);
 
@@ -232,19 +235,19 @@ const GalleryAdmin = () => {
 
   // Category management toolbar state
   const [newCategoryInput, setNewCategoryInput] = useState('');
-  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(true);
+  const [editingCatId, setEditingCatId] = useState(null);
+  const [editingCatName, setEditingCatName] = useState('');
 
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
   };
 
-  // Merge default categories, custom categories from Firestore, and any active exhibit categories
-  const customCatNames = (customCategoryDocs || []).map((c) => c.name).filter(Boolean);
-  const exhibitCatNames = (items || []).map((i) => i.category).filter(Boolean);
-  const allAvailableCategories = Array.from(
-    new Set([...DEFAULT_CATEGORIES, ...customCatNames, ...exhibitCatNames])
-  );
+  // ONLY categories created by the admin (no hardcoded demo categories)
+  const availableCategories = (customCategoryDocs || [])
+    .map((c) => c.name?.trim())
+    .filter(Boolean);
 
   const handleAddCategory = async (name) => {
     const clean = name.trim();
@@ -253,9 +256,11 @@ const GalleryAdmin = () => {
       const exists = (customCategoryDocs || []).some(
         (c) => (c.name || '').toLowerCase() === clean.toLowerCase()
       );
-      if (!exists) {
-        await addCategoryDoc({ name: clean, createdAt: new Date().toISOString() });
+      if (exists) {
+        showToast(`Category "${clean}" already exists.`);
+        return;
       }
+      await addCategoryDoc({ name: clean, createdAt: new Date().toISOString() });
       showToast(`Category "${clean}" created successfully.`);
       setNewCategoryInput('');
     } catch (err) {
@@ -263,8 +268,38 @@ const GalleryAdmin = () => {
     }
   };
 
+  const handleStartEditCategory = (cat) => {
+    setEditingCatId(cat.id);
+    setEditingCatName(cat.name);
+  };
+
+  const handleSaveEditCategory = async (catId, oldName) => {
+    const clean = editingCatName.trim();
+    if (!clean || clean.toLowerCase() === oldName.toLowerCase()) {
+      setEditingCatId(null);
+      return;
+    }
+    try {
+      await updateCategoryDoc(catId, { name: clean, updatedAt: new Date().toISOString() });
+
+      // Synchronize any exhibits that were tagged with the old category name
+      const affectedItems = (items || []).filter(
+        (i) => (i.category || '').toLowerCase() === oldName.toLowerCase()
+      );
+      for (const it of affectedItems) {
+        await update(it.id, { category: clean });
+      }
+
+      showToast(`Category updated to "${clean}".`);
+      setEditingCatId(null);
+      setEditingCatName('');
+    } catch (err) {
+      showToast('Error updating category: ' + err.message);
+    }
+  };
+
   const handleDeleteCategory = async (catDocId, catName) => {
-    if (!window.confirm(`Delete category "${catName}"?`)) return;
+    if (!window.confirm(`Delete category "${catName}"? This category will be removed from all device filters.`)) return;
     try {
       await removeCategoryDoc(catDocId);
       showToast(`Category "${catName}" deleted.`);
@@ -298,7 +333,7 @@ const GalleryAdmin = () => {
     }
   };
 
-  const usedCategories = ['all', ...allAvailableCategories];
+  const usedCategories = ['all', ...availableCategories];
 
   const filtered = (items || []).filter((i) => {
     if (filterCat === 'all') return true;
@@ -359,10 +394,10 @@ const GalleryAdmin = () => {
             <div>
               <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
                 <Tag className="w-4 h-4" />
-                <span>CATEGORY ARCHITECTURE (CREATED BY ADMIN)</span>
+                <span>CATEGORY ARCHITECTURE (ADMIN CONTROLLED)</span>
               </h3>
               <p className="text-[11px] text-neutral-500 font-medium mt-0.5">
-                Create new categories here. They sync in real-time across devices and appear on the public Lookbook filter.
+                Create, edit, or delete categories here. They sync in real-time across all devices with zero demo data.
               </p>
             </div>
 
@@ -391,30 +426,72 @@ const GalleryAdmin = () => {
             </form>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            {allAvailableCategories.map((cat) => {
-              const customMatch = (customCategoryDocs || []).find(
-                (c) => (c.name || '').toLowerCase() === cat.toLowerCase()
-              );
-              return (
-                <div
-                  key={cat}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 border border-neutral-300 text-xs font-bold uppercase tracking-wider text-black"
-                >
-                  <span>{cat}</span>
-                  {customMatch && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCategory(customMatch.id, cat)}
-                      className="text-neutral-400 hover:text-rose-600 transition-colors ml-1 cursor-pointer"
-                      title={`Delete category ${cat}`}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+          <div className="flex flex-wrap gap-2.5 pt-1">
+            {(!customCategoryDocs || customCategoryDocs.length === 0) ? (
+              <div className="p-4 border border-dashed border-neutral-300 text-center w-full text-neutral-400 text-xs font-medium uppercase tracking-wider">
+                NO CATEGORIES CREATED YET. ENTER A NAME ABOVE AND CLICK "CREATE" TO ADD YOUR FIRST CATEGORY.
+              </div>
+            ) : (
+              customCategoryDocs.map((cat) => {
+                const isEditing = editingCatId === cat.id;
+                return (
+                  <div
+                    key={cat.id}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 border border-neutral-300 text-xs font-bold uppercase tracking-wider text-black hover:border-black transition-colors"
+                  >
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={editingCatName}
+                          onChange={(e) => setEditingCatName(e.target.value)}
+                          className="bg-white border border-neutral-400 text-black text-xs font-bold px-2 py-0.5 focus:outline-none focus:border-black uppercase"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEditCategory(cat.id, cat.name)}
+                          className="text-emerald-600 hover:text-emerald-700 p-0.5 cursor-pointer"
+                          title="Save category name"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingCatId(null)}
+                          className="text-neutral-400 hover:text-black p-0.5 cursor-pointer"
+                          title="Cancel"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span>{cat.name}</span>
+                        <div className="flex items-center gap-1 border-l border-neutral-300 pl-1.5 ml-1">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditCategory(cat)}
+                            className="text-neutral-400 hover:text-black transition-colors p-0.5 cursor-pointer"
+                            title={`Edit category ${cat.name}`}
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                            className="text-neutral-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
+                            title={`Delete category ${cat.name}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -541,7 +618,7 @@ const GalleryAdmin = () => {
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         initial={editItem}
-        availableCategories={allAvailableCategories}
+        availableCategories={availableCategories}
         onAddCategory={handleAddCategory}
       />
 

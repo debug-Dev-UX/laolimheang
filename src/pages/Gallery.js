@@ -41,10 +41,11 @@ const Gallery = () => {
 
   const categories = [
     'ALL',
-    ...new Set([
-      ...customCats,
-      ...items.map((item) => (item.category || 'WORK').toUpperCase()).filter(Boolean),
-    ]),
+    ...new Set(
+      customCats.length > 0
+        ? customCats
+        : items.map((item) => (item.category || '').toUpperCase()).filter(Boolean)
+    ),
   ];
 
   const filtered = items.filter((item) => {

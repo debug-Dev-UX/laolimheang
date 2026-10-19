@@ -208,6 +208,7 @@ export const ImageZoomModal = ({
 
       {/* ── Main Zoomable Viewport ── */}
       <div
+        id="image-zoom-viewport"
         className="relative w-full h-full flex items-center justify-center overflow-hidden"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
